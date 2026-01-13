@@ -92,3 +92,10 @@
 - [ ] Enhanced closet analytics dashboard
 - [ ] Outfit selfie capture and storage
 - [ ] Inspiration boards for saving outfit ideas
+
+## GitHub & Supabase Integration (User Request)
+- [ ] Create GitHub repository for StyleMe Pro
+- [ ] Push code to GitHub
+- [ ] Configure Supabase as database
+- [ ] Set up Supabase tables for clothing items, outfits, wishlist, trips
+- [ ] Update app to use Supabase for cloud sync

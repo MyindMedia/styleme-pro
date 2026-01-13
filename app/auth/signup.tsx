@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter, Link } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Haptics from "expo-haptics";
 

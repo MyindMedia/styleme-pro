@@ -124,6 +124,6 @@
 - [x] Create ENV_SETUP.md with environment variable documentation
 
 ## GitHub Repository Setup (User Request)
-- [ ] Enable GitHub Actions workflow
-- [ ] Add README with CI status badge
-- [ ] Set up branch protection rules
+- [ ] Enable GitHub Actions workflow (requires manual setup - see instructions below)
+- [x] Add README with CI status badge
+- [ ] Set up branch protection rules (requires manual setup in GitHub)

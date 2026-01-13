@@ -31,6 +31,15 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "Closet",
@@ -58,21 +67,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="community"
-        options={{
-          title: "Community",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="groups" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="person" size={size} color={color} />
           ),
+        }}
+      />
+      {/* Hide community tab for now */}
+      <Tabs.Screen
+        name="community"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

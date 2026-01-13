@@ -29,6 +29,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook") => Promise<{ error: AuthError | null }>;
+  setSessionManually: (accessToken: string, refreshToken: string) => Promise<{ error: AuthError | null }>; // Add this
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
@@ -162,10 +163,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider,
         options: {
           redirectTo,
+          skipBrowserRedirect: false, // Ensure browser handles the redirect
         },
       });
 
       return { error };
+    } catch (error) {
+      return { error: error as AuthError };
+    }
+  };
+
+  // Manual session setter for callback
+  const setSessionManually = async (accessToken: string, refreshToken: string) => {
+    try {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) throw error;
+
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        // Fetch profile immediately
+        const userProfile = await fetchProfile(data.session.user.id);
+        setProfile(userProfile);
+        // Force loading to false immediately
+        setIsLoading(false);
+      }
+      
+      return { error: null };
     } catch (error) {
       return { error: error as AuthError };
     }
@@ -270,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signIn,
     signInWithOAuth,
+    setSessionManually,
     signOut,
     resetPassword,
     updatePassword,

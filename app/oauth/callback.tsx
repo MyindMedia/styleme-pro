@@ -5,9 +5,11 @@ import { useRouter } from "expo-router";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 import { ThemedView } from "@/components/themed-view";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function OAuthCallback() {
   const router = useRouter();
+  const { setSessionManually } = useAuth();
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -93,13 +95,17 @@ export default function OAuthCallback() {
           console.log("[OAuth] Code found, exchanging for session...");
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeError) throw exchangeError;
+          
+          // Manually update context if session exists
+          if (data.session) {
+             await setSessionManually(data.session.access_token, data.session.refresh_token);
+          }
           console.log("[OAuth] Code exchange successful");
         } else if (accessToken && refreshToken) {
           console.log("[OAuth] Tokens found, setting session...");
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+          // Use manual setter to update context immediately
+          const { error: sessionError } = await setSessionManually(accessToken, refreshToken);
+          
           if (sessionError) throw sessionError;
           console.log("[OAuth] Session set successful");
         } else {

@@ -37,9 +37,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === "auth";
+    const inOAuthGroup = segments[0] === "oauth";
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // User is not signed in and not on an auth page, redirect to login
+    if (!isAuthenticated && !inAuthGroup && !inOAuthGroup) {
+      // User is not signed in and not on an auth/oauth page, redirect to login
       router.replace("/auth/login");
     } else if (isAuthenticated && inAuthGroup) {
       // User is signed in but on an auth page, redirect to home

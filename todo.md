@@ -137,3 +137,7 @@
 - [x] Create feature request issue template
 - [x] Create PR template
 - [x] Set up GitHub Projects board (instructions in GITHUB_SETUP.md)
+
+## GitHub Issues Creation (User Request)
+- [x] Create issue for Google reverse image lookup feature (#7)
+- [x] Create issues for other planned features (#1-6)

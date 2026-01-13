@@ -44,9 +44,12 @@ export default function OAuthCallback() {
         const parsedUrl = new URL(activeUrl);
         code = parsedUrl.searchParams.get("code");
         error = parsedUrl.searchParams.get("error_description") || parsedUrl.searchParams.get("error");
+        
+        console.log("[OAuth] Parsed Params - Code:", code ? "Yes" : "No", "Error:", error);
 
         // Check hash params (Implicit flow)
         if (parsedUrl.hash) {
+          console.log("[OAuth] Hash found:", parsedUrl.hash);
           const hashParams = new URLSearchParams(parsedUrl.hash.replace(/^#/, ""));
           accessToken = hashParams.get("access_token");
           refreshToken = hashParams.get("refresh_token");
@@ -59,6 +62,7 @@ export default function OAuthCallback() {
         // e.g. /oauth/callback#access_token=...
         if (!accessToken && !code && Platform.OS === 'web') {
            const hash = window.location.hash;
+           console.log("[OAuth] Checking window.location.hash directly:", hash);
            if (hash) {
               const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
               accessToken = hashParams.get("access_token");

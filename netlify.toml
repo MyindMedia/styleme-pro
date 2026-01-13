@@ -1,10 +1,12 @@
 [build]
-  command = "npm run build:web"
+  command = "echo 'Build env check:' && echo \"SUPABASE_URL set: $(test -n \"$EXPO_PUBLIC_SUPABASE_URL\" && echo 'yes' || echo 'NO')\" && echo \"SUPABASE_KEY set: $(test -n \"$EXPO_PUBLIC_SUPABASE_ANON_KEY\" && echo 'yes' || echo 'NO')\" && npm run build:web"
   publish = "dist"
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "EXPO_PUBLIC_SUPABASE_ANON_KEY,EXPO_PUBLIC_SUPABASE_URL,REMOVE_BG_API_KEY"
   EXPO_PUBLIC_API_BASE_URL = "https://myfitcheck.netlify.app"
+  # Note: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY must be set in Netlify dashboard
+  NODE_ENV = "production"
 
 [functions]
   directory = "netlify/functions"

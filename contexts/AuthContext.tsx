@@ -76,21 +76,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize auth state
   useEffect(() => {
+    let isMounted = true;
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile);
+        const userProfile = await fetchProfile(session.user.id);
+        if (isMounted) {
+          setProfile(userProfile);
+        }
       }
 
-      setIsLoading(false);
+      if (isMounted) {
+        setIsLoading(false);
+      }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+
         console.log("Auth state changed:", event);
 
         setSession(session);
@@ -98,7 +109,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           const userProfile = await fetchProfile(session.user.id);
-          setProfile(userProfile);
+          if (isMounted) {
+            setProfile(userProfile);
+          }
         } else {
           setProfile(null);
         }
@@ -108,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
@@ -176,6 +190,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Manual session setter for callback
   const setSessionManually = async (accessToken: string, refreshToken: string) => {
     try {
+      // Validate inputs
+      if (!accessToken || !refreshToken) {
+        throw new Error("Missing access token or refresh token");
+      }
+
       const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
@@ -191,10 +210,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(userProfile);
         // Force loading to false immediately
         setIsLoading(false);
+      } else {
+        // Session was not created - this shouldn't happen but handle it
+        console.error("[Auth] setSession succeeded but no session returned");
+        throw new Error("Session creation failed - no session returned");
       }
-      
+
       return { error: null };
     } catch (error) {
+      console.error("[Auth] setSessionManually error:", error);
       return { error: error as AuthError };
     }
   };

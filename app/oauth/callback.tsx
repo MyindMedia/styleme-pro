@@ -17,12 +17,18 @@ export default function OAuthCallback() {
     // Only run on client-side
     if (typeof window === 'undefined') return;
 
+    let isMounted = true;
+    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let errorTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const handleCallback = async () => {
       try {
         console.log("[OAuth] Callback handler triggered");
-        
+
         // Wait a brief moment to ensure window.location is populated correctly on some devices/browsers
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (!isMounted) return;
         
         // Get the initial URL or the current URL handled by Expo Router
         // On web, Linking.getInitialURL() might be empty or not what we expect
@@ -33,10 +39,10 @@ export default function OAuthCallback() {
            activeUrl = window.location.href;
            console.log("[OAuth] Web detected, using window.location.href:", activeUrl);
         } else {
-           const url = await Linking.getInitialURL();
-           const currentUrl = Linking.useURL?.();
-           activeUrl = currentUrl || url;
-           console.log("[OAuth] Native detected, using Linking:", activeUrl);
+           // Note: For native, we rely on getInitialURL since useURL is a hook
+           // and cannot be called inside an async function
+           activeUrl = await Linking.getInitialURL();
+           console.log("[OAuth] Native detected, using Linking.getInitialURL:", activeUrl);
         }
 
         if (!activeUrl) {
@@ -122,26 +128,41 @@ export default function OAuthCallback() {
           }
         }
 
+        if (!isMounted) return;
+
         setStatus("success");
         console.log("[OAuth] Success! Redirecting to tabs...");
         // Add a small delay to ensure session is propagated
-        setTimeout(() => {
-          router.replace("/(tabs)");
+        redirectTimeout = setTimeout(() => {
+          if (isMounted) {
+            router.replace("/(tabs)");
+          }
         }, 1000);
 
       } catch (err: any) {
+        if (!isMounted) return;
+
         console.error("[OAuth] Error:", err);
         setStatus("error");
         setErrorMessage(err.message || "Authentication failed");
         // Redirect back to login after delay
-        setTimeout(() => {
-          router.replace("/auth/login");
+        errorTimeout = setTimeout(() => {
+          if (isMounted) {
+            router.replace("/auth/login");
+          }
         }, 3000);
       }
     };
 
     handleCallback();
-  }, [router]);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+      if (errorTimeout) clearTimeout(errorTimeout);
+    };
+  }, [router, setSessionManually]);
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom", "left", "right"]}>

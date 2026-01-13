@@ -32,23 +32,40 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isNavigating) return;
 
     const inAuthGroup = segments[0] === "auth";
     const inOAuthGroup = segments[0] === "oauth";
+    const inOnboarding = segments[0] === "onboarding";
 
-    if (!isAuthenticated && !inAuthGroup && !inOAuthGroup) {
-      // User is not signed in and not on an auth/oauth page, redirect to login
-      console.log("[AuthGuard] Redirecting to login", { isAuthenticated, inAuthGroup, inOAuthGroup, segments });
+    // Allow onboarding and oauth routes without authentication
+    if (inOAuthGroup || inOnboarding) {
+      return;
+    }
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // User is not signed in and not on an auth page, redirect to login
+      console.log("[AuthGuard] Redirecting to login", { isAuthenticated, inAuthGroup, segments });
+      setIsNavigating(true);
       router.replace("/auth/login");
+      // Reset navigating state after a delay
+      setTimeout(() => setIsNavigating(false), 500);
     } else if (isAuthenticated && inAuthGroup) {
       // User is signed in but on an auth page, redirect to home
-      console.log("[AuthGuard] Redirecting to home", { isAuthenticated, inAuthGroup, inOAuthGroup, segments });
+      console.log("[AuthGuard] Redirecting to home", { isAuthenticated, inAuthGroup, segments });
+      setIsNavigating(true);
       router.replace("/(tabs)");
+      setTimeout(() => setIsNavigating(false), 500);
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, isNavigating]);
+
+  // Show nothing while loading to prevent flash of wrong content
+  if (isLoading) {
+    return null;
+  }
 
   return <>{children}</>;
 }

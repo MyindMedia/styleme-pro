@@ -2,12 +2,32 @@ import { createClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-// Supabase configuration
+// Check if we're running in a browser/client environment
+const isBrowser = typeof window !== "undefined";
+
+// Supabase configuration with validation
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 
-// Check if we're running in a browser/client environment
-const isBrowser = typeof window !== "undefined";
+// Debug logging for environment variables (only in browser to avoid SSR noise)
+if (isBrowser) {
+  const hasUrl = !!supabaseUrl && supabaseUrl.length > 0;
+  const hasKey = !!supabaseAnonKey && supabaseAnonKey.length > 0;
+
+  if (!hasUrl || !hasKey) {
+    console.error("[Supabase] Missing environment variables:", {
+      EXPO_PUBLIC_SUPABASE_URL: hasUrl ? "set" : "MISSING",
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: hasKey ? "set" : "MISSING",
+      urlLength: supabaseUrl?.length || 0,
+      keyLength: supabaseAnonKey?.length || 0,
+    });
+  } else {
+    console.log("[Supabase] Environment variables loaded:", {
+      url: supabaseUrl.substring(0, 30) + "...",
+      keyPrefix: supabaseAnonKey.substring(0, 20) + "...",
+    });
+  }
+}
 
 // Custom storage adapter for React Native with SSR safety
 const ExpoSecureStoreAdapter = {
@@ -36,6 +56,16 @@ const ExpoSecureStoreAdapter = {
     }
   },
 };
+
+// Validate required environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  if (isBrowser) {
+    console.error(
+      "[Supabase] CRITICAL: Cannot initialize - missing environment variables. " +
+      "Ensure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set."
+    );
+  }
+}
 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

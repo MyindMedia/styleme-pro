@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ClothingItem,
   ClothingCategory,
@@ -39,6 +40,7 @@ const CARD_WIDTH = (width - 48) / 2;
 export default function ClosetScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { profile, isLoading: authLoading } = useAuth();
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<ClothingCategory | "all">("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -51,17 +53,28 @@ export default function ClosetScreen() {
   // Check if onboarding is complete
   useEffect(() => {
     const checkOnboarding = async () => {
+      if (authLoading) return;
+
       try {
-        const onboardingComplete = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (!onboardingComplete) {
-          router.replace("/onboarding");
+        // Check profile preferences first (syncs across devices)
+        if (profile?.preferences?.onboarding_completed) {
+          return;
         }
+
+        // Fallback to local storage (for guest/offline or legacy)
+        const localOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (localOnboarding) {
+          return;
+        }
+
+        // If neither is true, redirect to onboarding
+        router.replace("/onboarding");
       } catch (error) {
         console.error("Error checking onboarding:", error);
       }
     };
     checkOnboarding();
-  }, [router]);
+  }, [profile, authLoading, router]);
 
   useEffect(() => {
     loadItems();

@@ -117,3 +117,8 @@
 - [x] Document all features and their locations
 - [x] Add changelog tracking all updates
 - [x] Include development setup instructions
+
+## Developer Experience (User Request)
+- [x] Create CONTRIBUTING.md with code style guidelines and PR process
+- [x] Set up GitHub Actions for CI/CD (testing, type checking)
+- [x] Create ENV_SETUP.md with environment variable documentation

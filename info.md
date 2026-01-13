@@ -425,6 +425,8 @@ const colors = useColors();
 
 | File | Description |
 |------|-------------|
+| `CONTRIBUTING.md` | Code style guidelines and PR process for contributors |
+| `ENV_SETUP.md` | Environment variables setup guide |
 | `design.md` | UI/UX design specifications and screen layouts |
 | `todo.md` | Feature tracking and development progress |
 | `research-fits-app.md` | Fits app competitive analysis |

@@ -12,18 +12,30 @@ export default function OAuthCallback() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Only run on client-side
+    if (typeof window === 'undefined') return;
+
     const handleCallback = async () => {
       try {
         console.log("[OAuth] Callback handler triggered");
         
+        // Wait a brief moment to ensure window.location is populated correctly on some devices/browsers
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Get the initial URL or the current URL handled by Expo Router
-        const url = await Linking.getInitialURL();
-        const currentUrl = Linking.useURL?.(); // useURL hook might not be available inside async
+        // On web, Linking.getInitialURL() might be empty or not what we expect
+        // So we prioritize window.location.href on web
+        let activeUrl: string | null = null;
         
-        // Use the URL that triggered this route
-        let activeUrl = currentUrl || url;
-        
-        console.log("[OAuth] Active URL:", activeUrl);
+        if (Platform.OS === 'web') {
+           activeUrl = window.location.href;
+           console.log("[OAuth] Web detected, using window.location.href:", activeUrl);
+        } else {
+           const url = await Linking.getInitialURL();
+           const currentUrl = Linking.useURL?.();
+           activeUrl = currentUrl || url;
+           console.log("[OAuth] Native detected, using Linking:", activeUrl);
+        }
 
         if (!activeUrl) {
            throw new Error("No URL found");
@@ -44,12 +56,9 @@ export default function OAuthCallback() {
         const parsedUrl = new URL(activeUrl);
         code = parsedUrl.searchParams.get("code");
         error = parsedUrl.searchParams.get("error_description") || parsedUrl.searchParams.get("error");
-        
-        console.log("[OAuth] Parsed Params - Code:", code ? "Yes" : "No", "Error:", error);
 
         // Check hash params (Implicit flow)
         if (parsedUrl.hash) {
-          console.log("[OAuth] Hash found:", parsedUrl.hash);
           const hashParams = new URLSearchParams(parsedUrl.hash.replace(/^#/, ""));
           accessToken = hashParams.get("access_token");
           refreshToken = hashParams.get("refresh_token");
@@ -62,7 +71,6 @@ export default function OAuthCallback() {
         // e.g. /oauth/callback#access_token=...
         if (!accessToken && !code && Platform.OS === 'web') {
            const hash = window.location.hash;
-           console.log("[OAuth] Checking window.location.hash directly:", hash);
            if (hash) {
               const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
               accessToken = hashParams.get("access_token");

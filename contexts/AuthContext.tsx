@@ -156,8 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider,
         options: {
           redirectTo: typeof window !== "undefined"
-            ? `${window.location.origin}/auth/callback`
-            : "styleme://auth/callback",
+            ? `${window.location.origin}/oauth/callback`
+            : "styleme://oauth/callback",
         },
       });
 

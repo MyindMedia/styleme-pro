@@ -31,6 +31,7 @@ const MAPPING = {
   "magnifyingglass": "search",
   "slider.horizontal.3": "tune",
   "xmark": "close",
+  "xmark.circle.fill": "cancel",
   "checkmark": "check",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",

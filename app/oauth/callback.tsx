@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,6 +102,21 @@ export default function OAuthCallback() {
         };
 
         // Try to set session - if it fails due to API key, store directly
+        const storeSessionDirectly = async () => {
+          // Store session directly in storage (bypass API verification)
+          // Supabase storage key format: sb-<project-ref>-auth-token
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+          const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+          const storageKey = `sb-${projectRef}-auth-token`;
+
+          // Use AsyncStorage (same as Supabase client uses)
+          await AsyncStorage.setItem(storageKey, JSON.stringify(session));
+          console.log("[OAuth] Session stored with key:", storageKey);
+
+          // Force full page reload to root - app will pick up session on restart
+          window.location.href = window.location.origin;
+        };
+
         try {
           const { error: setError } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -108,24 +124,19 @@ export default function OAuthCallback() {
           });
 
           if (setError) {
-            console.warn("[OAuth] setSession failed, storing session directly:", setError.message);
-            // Store session directly in storage (bypass API verification)
-            const storageKey = `sb-${new URL(process.env.EXPO_PUBLIC_SUPABASE_URL || "").hostname.split('.')[0]}-auth-token`;
-            localStorage.setItem(storageKey, JSON.stringify(session));
-
-            // Force page reload to pick up the new session
-            window.location.href = "/(tabs)";
+            console.warn("[OAuth] setSession failed:", setError.message);
+            console.log("[OAuth] Storing session directly and reloading...");
+            await storeSessionDirectly();
             return;
           }
         } catch (setErr: any) {
-          console.warn("[OAuth] setSession threw error, storing directly:", setErr.message);
-          const storageKey = `sb-${new URL(process.env.EXPO_PUBLIC_SUPABASE_URL || "").hostname.split('.')[0]}-auth-token`;
-          localStorage.setItem(storageKey, JSON.stringify(session));
-          window.location.href = "/";
+          console.warn("[OAuth] setSession threw error:", setErr.message);
+          console.log("[OAuth] Storing session directly and reloading...");
+          await storeSessionDirectly();
           return;
         }
 
-        console.log("[OAuth] Session set successfully!");
+        console.log("[OAuth] Session set successfully via Supabase!");
         if (isMounted) {
           setStatus("success");
           redirectTimeout = setTimeout(() => {

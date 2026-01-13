@@ -26,13 +26,7 @@ export default function OAuthCallback() {
         console.log("[OAuth] Active URL:", activeUrl);
 
         if (!activeUrl) {
-          // If no URL, check if we are on web and have a hash
-          if (Platform.OS === 'web' && window.location.hash) {
-             console.log("[OAuth] Using window.location.hash on web");
-             activeUrl = window.location.href;
-          } else {
-             throw new Error("No URL found");
-          }
+           throw new Error("No URL found");
         }
 
         // Parse the URL
@@ -59,6 +53,20 @@ export default function OAuthCallback() {
           if (!error) {
              error = hashParams.get("error_description") || hashParams.get("error");
           }
+        }
+        
+        // Special case for Supabase Redirect: sometimes hash params are not in window.location.hash but in the URL itself if redirected strangely
+        // e.g. /oauth/callback#access_token=...
+        if (!accessToken && !code && Platform.OS === 'web') {
+           const hash = window.location.hash;
+           if (hash) {
+              const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+              accessToken = hashParams.get("access_token");
+              refreshToken = hashParams.get("refresh_token");
+               if (!error) {
+                 error = hashParams.get("error_description") || hashParams.get("error");
+              }
+           }
         }
 
         if (error) {

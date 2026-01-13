@@ -8,7 +8,7 @@ const bundleId = "space.manus.styleme.pro.t20260112220619";
 // Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+const schemeFromBundleId = "styleme";
 
 const env = {
   // App branding - update these values directly (do not use env vars)

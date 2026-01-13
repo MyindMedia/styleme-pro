@@ -188,7 +188,7 @@ export default function LoginScreen() {
                 onPress={() => handleOAuthLogin("google")}
                 style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
-                <MaterialIcons name="mail" size={20} color="#EA4335" />
+                <Ionicons name="logo-google" size={20} color={colors.foreground} />
                 <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>Google</Text>
               </Pressable>
 

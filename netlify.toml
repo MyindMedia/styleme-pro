@@ -4,6 +4,7 @@
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "EXPO_PUBLIC_SUPABASE_ANON_KEY,EXPO_PUBLIC_SUPABASE_URL,REMOVE_BG_API_KEY"
+  EXPO_PUBLIC_API_BASE_URL = "https://myfitcheck.netlify.app"
 
 [functions]
   directory = "netlify/functions"

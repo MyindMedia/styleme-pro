@@ -21,10 +21,12 @@ export type Season = "spring" | "summer" | "fall" | "winter" | "all-season";
 export interface ClothingItem {
   id: string;
   imageUri: string;
+  name?: string; // Optional display name
   category: ClothingCategory;
   type: string; // Specific type within category
   color: string;
   brand: string;
+  style?: "casual" | "business" | "athletic" | "formal" | "streetwear" | "loungewear";
   purchasePrice: number;
   currentValue?: number;
   tags: string[];
@@ -37,6 +39,8 @@ export interface ClothingItem {
   wearCount: number;
   lastWornAt?: string;
   isFavorite?: boolean;
+  measurements?: GarmentMeasurements;
+  productUrl?: string; // Original product link for reference
 }
 
 export interface Outfit {
@@ -74,9 +78,13 @@ export interface CommunityPost {
 export interface UserProfile {
   id: string;
   name: string;
+  avatarUri?: string; // User's profile photo
+  tryOnAvatarUri?: string; // Full-body photo for virtual try-on
   digitalTwinUri?: string;
   isPro: boolean;
   createdAt: string;
+  bodyType?: "petite" | "athletic" | "curvy" | "tall" | "average";
+  skinTone?: string;
 }
 
 // ============ Trip & Packing Types ============
@@ -114,6 +122,60 @@ export interface PackingList {
   items: PackingItem[];
   createdAt: string;
   lastModified: string;
+}
+
+// ============ Garment Measurements Types ============
+
+export interface GarmentMeasurements {
+  // Top measurements (in inches)
+  chest?: number;
+  waist?: number;
+  length?: number;
+  shoulderWidth?: number;
+  sleeveLength?: number;
+  // Bottom measurements
+  inseam?: number;
+  rise?: number;
+  thigh?: number;
+  legOpening?: number;
+  hipWidth?: number;
+  // Dress/Full body
+  bustToHem?: number;
+  // Shoe measurements
+  usSize?: string;
+  euSize?: number;
+  // General
+  sizeLabel?: string; // XS, S, M, L, XL, etc.
+  fit?: "slim" | "regular" | "relaxed" | "oversized";
+  stretchLevel?: "none" | "slight" | "moderate" | "high";
+}
+
+export interface UserBodyMeasurements {
+  height?: number; // in inches
+  weight?: number; // in lbs
+  chest?: number;
+  waist?: number;
+  hips?: number;
+  inseam?: number;
+  shoulderWidth?: number;
+  armLength?: number;
+  shoeSize?: string;
+  preferredFit?: "slim" | "regular" | "relaxed";
+}
+
+export interface TryOnResult {
+  id: string;
+  userId: string;
+  clothingItemId: string;
+  generatedImageUri: string;
+  fitAnalysis: {
+    overallFit: "too-small" | "slightly-small" | "perfect" | "slightly-large" | "too-large";
+    shoulderFit?: string;
+    chestFit?: string;
+    lengthFit?: string;
+    recommendations?: string[];
+  };
+  createdAt: string;
 }
 
 // ============ Wishlist Types ============

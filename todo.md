@@ -20,8 +20,8 @@ These items need to be completed for MVP launch.
 
 | Status | Task | GitHub Issue |
 |--------|------|--------------|
-| [ ] | Implement Google reverse image lookup for clothing recognition | [#7](https://github.com/MyindMedia/styleme-pro/issues/7) |
-| [ ] | Add weather-based outfit recommendations | [#1](https://github.com/MyindMedia/styleme-pro/issues/1) |
+| [ ] | Implement Google reverse image lookup for clothing recognition | [#7](https://github.com/MyindMedia/styleme-pro/issues/7) | **In Progress** |
+| [ ] | Add weather-based outfit recommendations | [#1](https://github.com/MyindMedia/styleme-pro/issues/1) | **In Progress** |
 | [ ] | Implement user authentication (Google/Apple Sign-In) | [#5](https://github.com/MyindMedia/styleme-pro/issues/5) |
 | [ ] | Enable Supabase cloud sync for cross-device access | [#5](https://github.com/MyindMedia/styleme-pro/issues/5) |
 
@@ -31,6 +31,9 @@ Features that improve user experience but aren't blocking launch.
 | Status | Task | GitHub Issue |
 |--------|------|--------------|
 | [ ] | Automatic background removal for clothing photos | [#2](https://github.com/MyindMedia/styleme-pro/issues/2) |
+| [ ] | Virtual try-on AI with user avatar consistency | New Feature |
+| [ ] | Garment measurement extraction and fit preservation | New Feature |
+| [x] | Set up CodeRabbit for automated code reviews | DevOps |
 | [ ] | Outfit selfie capture and style diary | [#3](https://github.com/MyindMedia/styleme-pro/issues/3) |
 | [ ] | Enhanced closet analytics dashboard | [#4](https://github.com/MyindMedia/styleme-pro/issues/4) |
 | [ ] | Inspiration boards for saving outfit ideas | - |

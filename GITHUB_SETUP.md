@@ -535,7 +535,56 @@ Organize work with different views:
 
 ---
 
-## 7. Issue and PR Templates
+## 7. CodeRabbit AI Code Reviews
+
+CodeRabbit provides AI-powered code reviews on every pull request.
+
+### Step 1: Install CodeRabbit GitHub App
+
+1. Go to: https://github.com/apps/coderabbitai
+2. Click **Install**
+3. Select your account: **MyindMedia**
+4. Choose **Only select repositories**
+5. Select **styleme-pro**
+6. Click **Install**
+
+### Step 2: Configuration (Already Done)
+
+The `.coderabbit.yaml` configuration file is already in the repository with:
+
+- **Auto-review** enabled for all PRs to `main` and `develop`
+- **Path-specific instructions** for React Native, server code, and tests
+- **Assertive profile** for thorough reviews
+- **AST analysis** and linting tools enabled
+
+### Step 3: Using CodeRabbit
+
+Once installed, CodeRabbit will automatically:
+
+1. **Review every PR** with detailed comments
+2. **Summarize changes** at the top of each review
+3. **Suggest improvements** with code examples
+4. **Flag security issues** and performance problems
+
+**Interact with CodeRabbit:**
+- `@coderabbitai summary` - Get a summary of changes
+- `@coderabbitai review` - Request a re-review
+- `@coderabbitai resolve` - Mark a thread as resolved
+- `@coderabbitai help` - See all commands
+
+### CodeRabbit Review Focus Areas
+
+| File Type | Review Focus |
+|-----------|-------------|
+| `app/**/*.tsx` | SafeArea, NativeWind, haptics, accessibility |
+| `components/**` | Reusability, theming, performance |
+| `server/**` | Validation, security, error handling |
+| `lib/**` | Type safety, async patterns |
+| `tests/**` | Coverage, mocking, edge cases |
+
+---
+
+## 8. Issue and PR Templates
 
 Templates are included in the repository under `.github/`:
 
@@ -562,4 +611,5 @@ After completing all sections, your repository will have:
 | Project Board | ✅ |
 | Issue Templates | ✅ |
 | PR Template | ✅ |
+| CodeRabbit AI Reviews | ✅ |
 | Auto-merge (optional) | ⚙️ |

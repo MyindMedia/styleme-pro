@@ -1,0 +1,152 @@
+# CodeRabbit Configuration for FitCheck
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: "en-US"
+
+# Review settings
+reviews:
+  # Enable auto-review on all PRs
+  auto_review:
+    enabled: true
+    # Ignore drafts until ready for review
+    drafts: false
+    # Review base branches
+    base_branches:
+      - main
+      - develop
+
+  # Review profile - thorough for production code
+  profile: "assertive"
+
+  # Request changes on critical issues
+  request_changes_workflow: true
+
+  # High-level summary at the start of review
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+
+  # Enable poem in reviews (fun touch)
+  poem: false
+
+  # Review scope
+  path_filters:
+    # Include all source files
+    - "app/**"
+    - "components/**"
+    - "lib/**"
+    - "hooks/**"
+    - "server/**"
+    - "tests/**"
+    # Exclude generated/config files
+    - "!**/*.lock"
+    - "!**/node_modules/**"
+    - "!**/.expo/**"
+    - "!**/dist/**"
+    - "!**/*.d.ts"
+
+  # Path-specific instructions
+  path_instructions:
+    - path: "app/**/*.tsx"
+      instructions: |
+        Review React Native/Expo screens for:
+        - Proper use of ScreenContainer for SafeArea handling
+        - NativeWind/Tailwind class usage (no inline styles)
+        - Haptic feedback on interactive elements
+        - Proper loading and error states
+        - Memory leaks (cleanup in useEffect)
+        - Accessibility (labels, hints)
+
+    - path: "components/**/*.tsx"
+      instructions: |
+        Review components for:
+        - Reusability and proper prop typing
+        - Consistent styling with theme colors
+        - Performance (memo, useCallback where appropriate)
+        - No hardcoded colors (use theme tokens)
+
+    - path: "server/**/*.ts"
+      instructions: |
+        Review server code for:
+        - Input validation with Zod schemas
+        - Proper error handling and logging
+        - Security (no exposed secrets, proper auth checks)
+        - API response consistency
+        - LLM prompt quality and safety
+
+    - path: "lib/**/*.ts"
+      instructions: |
+        Review utility code for:
+        - Type safety
+        - Proper async/await handling
+        - Storage operations (AsyncStorage patterns)
+        - No memory leaks
+
+    - path: "tests/**/*.ts"
+      instructions: |
+        Review tests for:
+        - Meaningful test coverage
+        - Proper mocking
+        - Edge case handling
+        - Clear test descriptions
+
+# Chat settings for @coderabbitai mentions
+chat:
+  auto_reply: true
+
+# Early access features
+early_access: true
+
+# Tone settings
+tone_instructions: |
+  Be constructive and educational. When suggesting changes:
+  1. Explain WHY the change improves the code
+  2. Provide code examples when helpful
+  3. Prioritize security and performance issues
+  4. Be encouraging about good patterns found
+  
+  Focus on:
+  - React Native/Expo best practices
+  - TypeScript type safety
+  - Mobile performance optimization
+  - Accessibility compliance
+  - Security vulnerabilities
+
+# Knowledge base - project-specific context
+knowledge_base:
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  jira:
+    project_keys: []
+  linear:
+    team_keys: []
+
+# Tools configuration
+tools:
+  # Enable AST-based analysis
+  ast_grep:
+    essential_rules: true
+    rule_dirs: []
+    packages: []
+
+  # GitHub checks integration
+  github_checks:
+    enabled: true
+    timeout_ms: 90000
+
+  # Biome linting
+  biome:
+    enabled: true
+
+  # Shellcheck for scripts
+  shellcheck:
+    enabled: true
+
+  # Markdown lint
+  markdownlint:
+    enabled: true
+
+  # YAML lint
+  yamllint:
+    enabled: true

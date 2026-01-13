@@ -131,3 +131,9 @@
 ## Dependabot Setup (User Request)
 - [x] Create dependabot.yml configuration (in GITHUB_SETUP.md)
 - [x] Add setup instructions to GITHUB_SETUP.md
+
+## GitHub Templates & Project Board (User Request)
+- [x] Create bug report issue template
+- [x] Create feature request issue template
+- [x] Create PR template
+- [x] Set up GitHub Projects board (instructions in GITHUB_SETUP.md)

@@ -443,3 +443,123 @@ After completing all sections, your repository will have:
 | Dependabot security alerts | ✅ |
 | Grouped dependency PRs | ✅ |
 | Auto-merge (optional) | ⚙️ |
+
+---
+
+## 6. Set Up GitHub Projects Board
+
+GitHub Projects helps you track features, bugs, and releases visually using a Kanban-style board.
+
+### Step 1: Create the Project
+
+1. Go to your GitHub profile: https://github.com/MyindMedia
+2. Click the **Projects** tab
+3. Click **New project**
+4. Select **Board** template
+5. Name it: `FitCheck Development`
+6. Click **Create project**
+
+### Step 2: Configure Columns
+
+Set up these columns for your workflow:
+
+| Column | Purpose |
+|--------|----------|
+| **Backlog** | Ideas and future work |
+| **To Do** | Ready to be worked on |
+| **In Progress** | Currently being developed |
+| **In Review** | PRs awaiting review |
+| **Done** | Completed items |
+
+### Step 3: Link to Repository
+
+1. In your project, click **Settings** (gear icon)
+2. Under "Linked repositories", click **Link a repository**
+3. Search for and select `styleme-pro`
+4. Click **Link**
+
+### Step 4: Configure Automation
+
+Set up automatic status updates:
+
+1. Click **Workflows** in project settings
+2. Enable these automations:
+
+| Workflow | Action |
+|----------|--------|
+| **Item added to project** | Set status to "Backlog" |
+| **Item reopened** | Set status to "To Do" |
+| **Pull request merged** | Set status to "Done" |
+| **Item closed** | Set status to "Done" |
+
+### Step 5: Add Custom Fields (Optional)
+
+Enhance tracking with custom fields:
+
+1. Click **+ New field** in the project
+2. Add these fields:
+
+| Field Name | Type | Options |
+|------------|------|----------|
+| **Priority** | Single select | Critical, High, Medium, Low |
+| **Type** | Single select | Feature, Bug, Enhancement, Docs |
+| **Sprint** | Iteration | 2-week cycles |
+| **Estimate** | Number | Story points (1, 2, 3, 5, 8) |
+
+### Step 6: Create Views
+
+Organize work with different views:
+
+| View | Configuration |
+|------|---------------|
+| **Board** | Group by Status |
+| **Backlog** | Filter: Status = Backlog, Group by Priority |
+| **Current Sprint** | Filter: Sprint = current, Group by Assignee |
+| **Bug Tracker** | Filter: Type = Bug, Sort by Priority |
+
+### Using the Project Board
+
+**Adding Issues:**
+1. From the project, click **+ Add item**
+2. Type `#` to search repository issues
+3. Select the issue to add
+
+**Creating Issues from Project:**
+1. Click **+ Add item** in any column
+2. Type a title and press Enter
+3. Click the item to convert to a full issue
+
+**Tracking PRs:**
+- PRs are automatically added when linked to issues
+- Use "Fixes #123" in PR description to auto-link
+
+---
+
+## 7. Issue and PR Templates
+
+Templates are included in the repository under `.github/`:
+
+| Template | Location | Purpose |
+|----------|----------|----------|
+| Bug Report | `.github/ISSUE_TEMPLATE/bug_report.md` | Structured bug reports |
+| Feature Request | `.github/ISSUE_TEMPLATE/feature_request.md` | New feature proposals |
+| PR Template | `.github/pull_request_template.md` | Standardized PR descriptions |
+
+These templates are automatically used when creating new issues or PRs.
+
+---
+
+## Complete Repository Setup Summary
+
+After completing all sections, your repository will have:
+
+| Feature | Status |
+|---------|--------|
+| CI/CD Pipeline | ✅ |
+| Branch Protection | ✅ |
+| Dependabot Updates | ✅ |
+| Security Alerts | ✅ |
+| Project Board | ✅ |
+| Issue Templates | ✅ |
+| PR Template | ✅ |
+| Auto-merge (optional) | ⚙️ |

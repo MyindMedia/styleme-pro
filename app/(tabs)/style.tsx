@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -33,6 +34,80 @@ const MOODS = [
   { key: "athleisure", label: "Athleisure", icon: "fitness-center", color: "#4299E1" },
 ];
 
+// Demo items for when closet is empty
+const DEMO_ITEMS: ClothingItem[] = [
+  {
+    id: "demo-1",
+    imageUri: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400",
+    category: "tops",
+    type: "t-shirt",
+    color: "White",
+    brand: "Uniqlo",
+    purchasePrice: 29,
+    tags: [],
+    occasions: ["casual"],
+    seasons: ["all-season"],
+    createdAt: new Date().toISOString(),
+    wearCount: 0,
+  },
+  {
+    id: "demo-2",
+    imageUri: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400",
+    category: "bottoms",
+    type: "jeans",
+    color: "Blue",
+    brand: "Levi's",
+    purchasePrice: 89,
+    tags: [],
+    occasions: ["casual"],
+    seasons: ["all-season"],
+    createdAt: new Date().toISOString(),
+    wearCount: 0,
+  },
+  {
+    id: "demo-3",
+    imageUri: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400",
+    category: "shoes",
+    type: "sneakers",
+    color: "White",
+    brand: "Nike",
+    purchasePrice: 120,
+    tags: [],
+    occasions: ["casual", "athletic"],
+    seasons: ["all-season"],
+    createdAt: new Date().toISOString(),
+    wearCount: 0,
+  },
+  {
+    id: "demo-4",
+    imageUri: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400",
+    category: "outerwear",
+    type: "jacket",
+    color: "Black",
+    brand: "Zara",
+    purchasePrice: 149,
+    tags: [],
+    occasions: ["casual", "date-night"],
+    seasons: ["fall", "winter"],
+    createdAt: new Date().toISOString(),
+    wearCount: 0,
+  },
+  {
+    id: "demo-5",
+    imageUri: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400",
+    category: "accessories",
+    type: "watch",
+    color: "Silver",
+    brand: "Seiko",
+    purchasePrice: 250,
+    tags: [],
+    occasions: ["business", "casual"],
+    seasons: ["all-season"],
+    createdAt: new Date().toISOString(),
+    wearCount: 0,
+  },
+];
+
 const { width } = Dimensions.get("window");
 
 interface GeneratedOutfit {
@@ -49,6 +124,7 @@ export default function StyleMeScreen() {
   const [generatedOutfits, setGeneratedOutfits] = useState<GeneratedOutfit[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     const loadItems = async () => {
@@ -58,8 +134,14 @@ export default function StyleMeScreen() {
     loadItems();
   }, []);
 
+  const getItemsForGeneration = () => {
+    return isDemoMode ? DEMO_ITEMS : closetItems;
+  };
+
   const generateOutfits = useCallback(async () => {
-    if (closetItems.length < 2) {
+    const items = getItemsForGeneration();
+    
+    if (items.length < 2) {
       return;
     }
 
@@ -69,11 +151,12 @@ export default function StyleMeScreen() {
     // Simulate AI generation delay
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    const tops = closetItems.filter((i) => i.category === "tops");
-    const bottoms = closetItems.filter((i) => i.category === "bottoms");
-    const shoes = closetItems.filter((i) => i.category === "shoes");
-    const accessories = closetItems.filter((i) => i.category === "accessories");
-    const outerwear = closetItems.filter((i) => i.category === "outerwear");
+    const tops = items.filter((i) => i.category === "tops");
+    const bottoms = items.filter((i) => i.category === "bottoms");
+    const shoes = items.filter((i) => i.category === "shoes");
+    const accessories = items.filter((i) => i.category === "accessories");
+    const outerwear = items.filter((i) => i.category === "outerwear");
+    const dresses = items.filter((i) => i.category === "dresses");
 
     const outfits: GeneratedOutfit[] = [];
 
@@ -81,14 +164,19 @@ export default function StyleMeScreen() {
     for (let i = 0; i < 3; i++) {
       const outfitItems: ClothingItem[] = [];
 
-      // Pick a random top
-      if (tops.length > 0) {
-        outfitItems.push(tops[Math.floor(Math.random() * tops.length)]);
-      }
+      // Either pick a dress OR top+bottom combo
+      if (dresses.length > 0 && Math.random() > 0.7) {
+        outfitItems.push(dresses[Math.floor(Math.random() * dresses.length)]);
+      } else {
+        // Pick a random top
+        if (tops.length > 0) {
+          outfitItems.push(tops[Math.floor(Math.random() * tops.length)]);
+        }
 
-      // Pick a random bottom
-      if (bottoms.length > 0) {
-        outfitItems.push(bottoms[Math.floor(Math.random() * bottoms.length)]);
+        // Pick a random bottom
+        if (bottoms.length > 0) {
+          outfitItems.push(bottoms[Math.floor(Math.random() * bottoms.length)]);
+        }
       }
 
       // Pick random shoes
@@ -118,9 +206,21 @@ export default function StyleMeScreen() {
     setIsGenerating(false);
     setHasGenerated(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [closetItems, selectedMood]);
+  }, [closetItems, selectedMood, isDemoMode]);
 
   const handleSaveOutfit = async (outfit: GeneratedOutfit) => {
+    if (isDemoMode) {
+      Alert.alert(
+        "Demo Mode",
+        "Add items to your closet to save outfits! Tap 'Add Items' to get started.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Add Items", onPress: () => router.push("/add-item") },
+        ]
+      );
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     const newOutfit: Outfit = {
@@ -135,6 +235,21 @@ export default function StyleMeScreen() {
 
     await saveOutfit(newOutfit);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Saved!", "Outfit saved to your collection.");
+  };
+
+  const handleTryDemo = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsDemoMode(true);
+    setHasGenerated(false);
+    setGeneratedOutfits([]);
+  };
+
+  const handleExitDemo = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsDemoMode(false);
+    setHasGenerated(false);
+    setGeneratedOutfits([]);
   };
 
   const renderMoodPill = ({ item }: { item: typeof MOODS[0] }) => {
@@ -177,8 +292,15 @@ export default function StyleMeScreen() {
     return (
       <View style={[styles.outfitCard, { backgroundColor: colors.surface }]}>
         <View style={styles.outfitHeader}>
-          <View style={[styles.outfitBadge, { backgroundColor: moodInfo?.color || colors.primary }]}>
-            <Text style={styles.outfitBadgeText}>Look {index + 1}</Text>
+          <View style={styles.outfitHeaderLeft}>
+            <View style={[styles.outfitBadge, { backgroundColor: moodInfo?.color || colors.primary }]}>
+              <Text style={styles.outfitBadgeText}>Look {index + 1}</Text>
+            </View>
+            {isDemoMode && (
+              <View style={[styles.demoBadge, { backgroundColor: colors.warning }]}>
+                <Text style={styles.demoBadgeText}>Demo</Text>
+              </View>
+            )}
           </View>
           <Pressable
             onPress={() => handleSaveOutfit(item)}
@@ -213,30 +335,85 @@ export default function StyleMeScreen() {
     );
   };
 
+  const canGenerate = isDemoMode || closetItems.length >= 2;
+  const itemCount = isDemoMode ? DEMO_ITEMS.length : closetItems.length;
+
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <MaterialIcons name="auto-awesome" size={64} color={colors.muted} />
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-        {closetItems.length < 2
-          ? "Add More Items"
-          : "Ready to Style You"}
+        {closetItems.length < 2 ? "Add Items to Get Started" : "Ready to Style You"}
       </Text>
       <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
         {closetItems.length < 2
-          ? "Add at least 2 items to your closet to generate outfits"
+          ? "Add at least 2 items to your closet, or try demo mode to see how it works!"
           : "Select a mood and tap Generate to create AI-powered looks"}
       </Text>
+      
+      {closetItems.length < 2 && (
+        <View style={styles.emptyActions}>
+          <Pressable
+            onPress={() => router.push("/add-item")}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 },
+            ]}
+          >
+            <MaterialIcons name="add" size={20} color={colors.background} />
+            <Text style={[styles.primaryButtonText, { color: colors.background }]}>
+              Add Items
+            </Text>
+          </Pressable>
+          
+          <Pressable
+            onPress={handleTryDemo}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
+            ]}
+          >
+            <MaterialIcons name="play-arrow" size={20} color={colors.foreground} />
+            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>
+              Try Demo Mode
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Style Me</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          AI-powered outfit suggestions
-        </Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={[styles.title, { color: colors.foreground }]}>Style Me</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
+              AI-powered outfit suggestions
+            </Text>
+          </View>
+          {isDemoMode && (
+            <Pressable
+              onPress={handleExitDemo}
+              style={({ pressed }) => [
+                styles.exitDemoButton,
+                { backgroundColor: colors.warning, opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text style={styles.exitDemoText}>Exit Demo</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      {isDemoMode && (
+        <View style={[styles.demoBanner, { backgroundColor: colors.warning + "20" }]}>
+          <MaterialIcons name="info" size={18} color={colors.warning} />
+          <Text style={[styles.demoBannerText, { color: colors.warning }]}>
+            Demo Mode: Using sample items. Add your own clothes to save outfits!
+          </Text>
+        </View>
+      )}
 
       <View style={styles.moodSection}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -254,12 +431,12 @@ export default function StyleMeScreen() {
 
       <Pressable
         onPress={generateOutfits}
-        disabled={isGenerating || closetItems.length < 2}
+        disabled={isGenerating || !canGenerate}
         style={({ pressed }) => [
           styles.generateButton,
           {
             backgroundColor: colors.primary,
-            opacity: isGenerating || closetItems.length < 2 ? 0.5 : pressed ? 0.9 : 1,
+            opacity: isGenerating || !canGenerate ? 0.5 : pressed ? 0.9 : 1,
           },
         ]}
       >
@@ -269,7 +446,7 @@ export default function StyleMeScreen() {
           <>
             <MaterialIcons name="auto-awesome" size={20} color={colors.background} />
             <Text style={[styles.generateButtonText, { color: colors.background }]}>
-              Generate Looks
+              Generate Looks {itemCount > 0 && `(${itemCount} items)`}
             </Text>
           </>
         )}
@@ -301,6 +478,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
   title: {
     fontSize: 32,
     fontWeight: "700",
@@ -309,6 +491,29 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     marginTop: 2,
+  },
+  exitDemoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  exitDemoText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#000",
+  },
+  demoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  demoBannerText: {
+    flex: 1,
+    fontSize: 13,
   },
   moodSection: {
     marginBottom: 16,
@@ -365,6 +570,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
+  outfitHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   outfitBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -374,6 +584,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#fff",
+  },
+  demoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  demoBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#000",
   },
   saveButton: {
     flexDirection: "row",
@@ -413,16 +633,49 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 60,
+    paddingTop: 40,
+    paddingHorizontal: 20,
     gap: 12,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "600",
+    textAlign: "center",
   },
   emptySubtitle: {
     fontSize: 15,
     textAlign: "center",
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
+    lineHeight: 22,
+  },
+  emptyActions: {
+    marginTop: 20,
+    gap: 12,
+    width: "100%",
+    maxWidth: 280,
+  },
+  primaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

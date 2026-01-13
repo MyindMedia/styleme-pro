@@ -4,6 +4,15 @@
 
 ---
 
+## 🐛 Bug Fixes (User Report)
+
+| Status | Task | Notes |
+|--------|------|-------|
+| [x] | Fix Style Me tab functionality | Added demo mode, better empty state, clear messaging |
+| [x] | Fix Profile tab functionality | All menu buttons now have working actions with alerts |
+
+---
+
 ## 🚀 Active Development
 
 ### Priority 1: Core App Completion

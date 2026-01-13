@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Platform,
   ViewToken,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -16,9 +17,6 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useAuth } from "@/contexts/AuthContext";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface OnboardingSlide {
   id: string;
@@ -89,6 +87,12 @@ export default function OnboardingScreen() {
   const colors = useColors();
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Use hook for dynamic dimensions (fixes web SSR issue where Dimensions returns 0)
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Fallback for SSR or initial render
+  const SCREEN_WIDTH = screenWidth > 0 ? screenWidth : 375;
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -189,6 +193,17 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  // Wait for valid dimensions on web
+  if (Platform.OS === "web" && screenWidth === 0) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+        <View style={[styles.container, { backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }]}>
+          <Text style={{ color: colors.muted }}>Loading...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -208,6 +223,7 @@ export default function OnboardingScreen() {
         <View style={styles.slidesContainer}>
           <FlatList
             ref={flatListRef}
+            key={`flatlist-${SCREEN_WIDTH}`}
             data={ONBOARDING_SLIDES}
             renderItem={renderSlide}
             keyExtractor={(item) => item.id}
@@ -222,6 +238,8 @@ export default function OnboardingScreen() {
               index,
             })}
             bounces={false}
+            initialNumToRender={1}
+            maxToRenderPerBatch={2}
           />
         </View>
 

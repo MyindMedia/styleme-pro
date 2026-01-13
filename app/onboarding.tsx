@@ -94,20 +94,23 @@ export default function OnboardingScreen() {
   // Fallback for SSR or initial render
   const SCREEN_WIDTH = screenWidth > 0 ? screenWidth : 375;
 
-  const onViewableItemsChanged = useCallback(
+  // Use ref for stable callback reference (required by FlatList on web)
+  const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const newIndex = viewableItems[0].index;
-        if (newIndex !== currentIndex) {
-          setCurrentIndex(newIndex);
-          if (Platform.OS !== "web") {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setCurrentIndex((prev) => {
+          if (newIndex !== prev) {
+            if (Platform.OS !== "web") {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            return newIndex;
           }
-        }
+          return prev;
+        });
       }
-    },
-    [currentIndex]
-  );
+    }
+  ).current;
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,

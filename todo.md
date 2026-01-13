@@ -104,3 +104,10 @@
 - [x] Update app name to "FitCheck" in app.config.ts
 - [x] Update branding title in webdev secrets
 - [x] Update any hardcoded references in the app
+
+## Smart Item Recognition (User Request)
+- [x] Add reverse image search to identify clothing items automatically
+- [x] Extract item details (brand, type, color, price) from image recognition
+- [x] Add product URL input as fallback to scrape item details from store pages
+- [x] Implement manual input fallback when both methods fail
+- [x] Update add-item screen with recognition flow

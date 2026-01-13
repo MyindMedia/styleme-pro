@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Text,
   View,
@@ -9,15 +9,18 @@ import {
   Alert,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
+import * as FileSystem from "expo-file-system/legacy";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { trpc } from "@/lib/trpc";
 import {
   ClothingCategory,
   ClothingItem,
@@ -30,6 +33,8 @@ import {
   SEASONS,
   POPULAR_BRANDS,
 } from "@/lib/storage";
+
+type RecognitionStep = "input" | "analyzing" | "review" | "manual";
 
 const CATEGORIES: { key: ClothingCategory; label: string; icon: string }[] = [
   { key: "tops", label: "Tops", icon: "checkroom" },
@@ -62,6 +67,13 @@ export default function AddItemScreen() {
   const colors = useColors();
   const router = useRouter();
 
+  // Recognition flow state
+  const [step, setStep] = useState<RecognitionStep>("input");
+  const [productUrl, setProductUrl] = useState("");
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  const [recognitionConfidence, setRecognitionConfidence] = useState<number>(0);
+
+  // Item state
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [category, setCategory] = useState<ClothingCategory>("tops");
   const [type, setType] = useState<string>("t-shirt");
@@ -74,6 +86,10 @@ export default function AddItemScreen() {
   const [saving, setSaving] = useState(false);
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [brandSearch, setBrandSearch] = useState("");
+
+  // tRPC mutations
+  const recognizeFromImage = trpc.clothing.recognizeFromImage.useMutation();
+  const recognizeFromUrl = trpc.clothing.recognizeFromUrl.useMutation();
 
   const filteredBrands = POPULAR_BRANDS.filter((b) =>
     b.toLowerCase().includes(brandSearch.toLowerCase())
@@ -107,8 +123,146 @@ export default function AddItemScreen() {
         });
 
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Start AI recognition
+      analyzeImage(uri);
+    }
+  };
+
+  const analyzeImage = async (uri: string) => {
+    setStep("analyzing");
+    setRecognitionError(null);
+
+    try {
+      // Convert image to base64
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
+      });
+
+      const result = await recognizeFromImage.mutateAsync({
+        imageBase64: base64,
+        mimeType: "image/jpeg",
+      });
+
+      if (result.success && result.item) {
+        // Apply recognized values
+        applyRecognizedItem(result.item);
+        setRecognitionConfidence(result.item.confidence || 0.8);
+        setStep("review");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setRecognitionError(result.error || "Could not recognize item");
+        setStep("manual");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+    } catch (error) {
+      console.error("Recognition error:", error);
+      setRecognitionError("Recognition failed. Please enter details manually.");
+      setStep("manual");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const analyzeUrl = async () => {
+    if (!productUrl.trim()) {
+      Alert.alert("Missing URL", "Please enter a product URL.");
+      return;
+    }
+
+    setStep("analyzing");
+    setRecognitionError(null);
+
+    try {
+      const result = await recognizeFromUrl.mutateAsync({
+        productUrl: productUrl.trim(),
+      });
+
+      if (result.success && result.item) {
+        // Apply recognized values
+        applyRecognizedItem(result.item);
+        
+        // If there's an image URL, set it
+        if (result.item.imageUrl) {
+          setImageUri(result.item.imageUrl);
+        }
+        
+        setRecognitionConfidence(0.9); // URL scraping is usually accurate
+        setStep("review");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setRecognitionError(result.error || "Could not extract product details");
+        setStep("manual");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+    } catch (error) {
+      console.error("URL scraping error:", error);
+      setRecognitionError("Could not fetch product details. Please enter manually.");
+      setStep("manual");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const applyRecognizedItem = (item: any) => {
+    // Map category
+    const categoryMap: Record<string, ClothingCategory> = {
+      tops: "tops",
+      bottoms: "bottoms",
+      shoes: "shoes",
+      accessories: "accessories",
+      outerwear: "outerwear",
+      dresses: "dresses",
+    };
+    
+    if (item.category && categoryMap[item.category.toLowerCase()]) {
+      setCategory(categoryMap[item.category.toLowerCase()]);
+    }
+
+    // Set type
+    if (item.type) {
+      setType(item.type.toLowerCase().replace(/\s+/g, "-"));
+    }
+
+    // Set color
+    if (item.color) {
+      const matchedColor = COLORS.find(
+        (c) => c.name.toLowerCase() === item.color.toLowerCase()
+      );
+      if (matchedColor) {
+        setSelectedColor(matchedColor.name);
+      }
+    }
+
+    // Set brand
+    if (item.brand && item.brand !== "Unknown") {
+      setBrand(item.brand);
+    }
+
+    // Set price
+    if (item.price || item.estimatedPrice) {
+      setPrice(String(item.price || item.estimatedPrice));
+    }
+
+    // Set occasions
+    if (item.occasions && Array.isArray(item.occasions)) {
+      const validOccasions = item.occasions.filter((o: string) =>
+        OCCASIONS.some((occ) => occ.key === o.toLowerCase())
+      ) as Occasion[];
+      if (validOccasions.length > 0) {
+        setSelectedOccasions(validOccasions);
+      }
+    }
+
+    // Set seasons
+    if (item.seasons && Array.isArray(item.seasons)) {
+      const validSeasons = item.seasons.filter((s: string) =>
+        SEASONS.some((sea) => sea.key === s.toLowerCase())
+      ) as Season[];
+      if (validSeasons.length > 0) {
+        setSelectedSeasons(validSeasons);
+      }
     }
   };
 
@@ -132,7 +286,6 @@ export default function AddItemScreen() {
 
   const handleCategoryChange = (newCategory: ClothingCategory) => {
     setCategory(newCategory);
-    // Set default type for new category
     const types = CLOTHING_TYPES[newCategory];
     if (types && types.length > 0) {
       setType(types[0].key);
@@ -170,285 +323,472 @@ export default function AddItemScreen() {
 
   const currentTypes = CLOTHING_TYPES[category] || [];
 
-  return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]}>
-      <View style={styles.header}>
+  // Render input step (choose method)
+  const renderInputStep = () => (
+    <View style={styles.inputStepContainer}>
+      <Text style={[styles.stepTitle, { color: colors.foreground }]}>Add New Item</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.muted }]}>
+        Choose how you want to add your clothing item
+      </Text>
+
+      {/* Camera/Gallery Option */}
+      <View style={styles.optionSection}>
+        <Text style={[styles.optionLabel, { color: colors.foreground }]}>
+          Scan with Camera
+        </Text>
+        <Text style={[styles.optionDescription, { color: colors.muted }]}>
+          Take a photo and AI will identify the item
+        </Text>
+        <View style={styles.imagePickerRow}>
+          <Pressable
+            onPress={() => pickImage(true)}
+            style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <MaterialIcons name="camera-alt" size={32} color={colors.primary} />
+            <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Camera</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => pickImage(false)}
+            style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <MaterialIcons name="photo-library" size={32} color={colors.primary} />
+            <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Gallery</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Divider */}
+      <View style={styles.dividerContainer}>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.muted }]}>OR</Text>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+      </View>
+
+      {/* URL Option */}
+      <View style={styles.optionSection}>
+        <Text style={[styles.optionLabel, { color: colors.foreground }]}>
+          Paste Product Link
+        </Text>
+        <Text style={[styles.optionDescription, { color: colors.muted }]}>
+          Enter a URL from any online store
+        </Text>
+        <View style={[styles.urlInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <MaterialIcons name="link" size={20} color={colors.muted} />
+          <TextInput
+            style={[styles.urlInput, { color: colors.foreground }]}
+            placeholder="https://store.com/product..."
+            placeholderTextColor={colors.muted}
+            value={productUrl}
+            onChangeText={setProductUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+        </View>
         <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <MaterialIcons name="close" size={24} color={colors.foreground} />
-        </Pressable>
-        <Text style={[styles.title, { color: colors.foreground }]}>Add Item</Text>
-        <Pressable
-          onPress={handleSave}
-          disabled={saving || !imageUri}
-          style={({ pressed }) => [
-            styles.saveButton,
+          onPress={analyzeUrl}
+          disabled={!productUrl.trim()}
+          style={[
+            styles.fetchButton,
             {
-              backgroundColor: colors.primary,
-              opacity: saving || !imageUri ? 0.5 : pressed ? 0.8 : 1,
+              backgroundColor: productUrl.trim() ? colors.primary : colors.surface,
+              opacity: productUrl.trim() ? 1 : 0.5,
             },
           ]}
         >
-          <Text style={[styles.saveText, { color: colors.background }]}>
-            {saving ? "Saving..." : "Save"}
+          <MaterialIcons name="download" size={18} color={productUrl.trim() ? colors.background : colors.muted} />
+          <Text style={[styles.fetchButtonText, { color: productUrl.trim() ? colors.background : colors.muted }]}>
+            Fetch Details
           </Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      {/* Divider */}
+      <View style={styles.dividerContainer}>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.muted }]}>OR</Text>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+      </View>
+
+      {/* Manual Option */}
+      <Pressable
+        onPress={() => setStep("manual")}
+        style={[styles.manualButton, { borderColor: colors.border }]}
       >
-        {/* Image Picker */}
+        <MaterialIcons name="edit" size={20} color={colors.foreground} />
+        <Text style={[styles.manualButtonText, { color: colors.foreground }]}>
+          Enter Details Manually
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  // Render analyzing step
+  const renderAnalyzingStep = () => (
+    <View style={styles.analyzingContainer}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={[styles.analyzingText, { color: colors.foreground }]}>
+        Analyzing your item...
+      </Text>
+      <Text style={[styles.analyzingSubtext, { color: colors.muted }]}>
+        AI is identifying brand, category, and details
+      </Text>
+    </View>
+  );
+
+  // Render review step (after recognition)
+  const renderReviewStep = () => (
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Recognition Result Banner */}
+      <View style={[styles.recognitionBanner, { backgroundColor: colors.success + "20" }]}>
+        <MaterialIcons name="auto-awesome" size={20} color={colors.success} />
+        <View style={styles.recognitionBannerText}>
+          <Text style={[styles.recognitionTitle, { color: colors.success }]}>
+            Item Recognized!
+          </Text>
+          <Text style={[styles.recognitionSubtitle, { color: colors.muted }]}>
+            {Math.round(recognitionConfidence * 100)}% confidence • Review and adjust if needed
+          </Text>
+        </View>
+      </View>
+
+      {renderItemForm()}
+    </ScrollView>
+  );
+
+  // Render manual entry step
+  const renderManualStep = () => (
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {recognitionError && (
+        <View style={[styles.errorBanner, { backgroundColor: colors.warning + "20" }]}>
+          <MaterialIcons name="info-outline" size={20} color={colors.warning} />
+          <Text style={[styles.errorText, { color: colors.warning }]}>
+            {recognitionError}
+          </Text>
+        </View>
+      )}
+
+      {/* Image Picker if no image yet */}
+      {!imageUri && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Photo</Text>
-          {imageUri ? (
-            <View style={styles.imageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="cover" />
+          <View style={styles.imagePickerRow}>
+            <Pressable
+              onPress={() => pickImage(true)}
+              style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <MaterialIcons name="camera-alt" size={32} color={colors.primary} />
+              <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Camera</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => pickImage(false)}
+              style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <MaterialIcons name="photo-library" size={32} color={colors.primary} />
+              <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Gallery</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {renderItemForm()}
+    </ScrollView>
+  );
+
+  // Common item form (used in review and manual steps)
+  const renderItemForm = () => (
+    <>
+      {/* Image Preview */}
+      {imageUri && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Photo</Text>
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="cover" />
+            <Pressable
+              onPress={() => {
+                setImageUri(null);
+                setStep("input");
+              }}
+              style={[styles.removeImageButton, { backgroundColor: colors.error }]}
+            >
+              <MaterialIcons name="close" size={16} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Category Selector */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.categoryGrid}>
+            {CATEGORIES.map((cat) => (
               <Pressable
-                onPress={() => setImageUri(null)}
-                style={[styles.removeImageButton, { backgroundColor: colors.error }]}
-              >
-                <MaterialIcons name="close" size={16} color="#fff" />
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.imagePickerRow}>
-              <Pressable
-                onPress={() => pickImage(true)}
-                style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <MaterialIcons name="camera-alt" size={32} color={colors.primary} />
-                <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Camera</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => pickImage(false)}
-                style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <MaterialIcons name="photo-library" size={32} color={colors.primary} />
-                <Text style={[styles.imagePickerText, { color: colors.foreground }]}>Gallery</Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-
-        {/* Category Selector */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.categoryGrid}>
-              {CATEGORIES.map((cat) => (
-                <Pressable
-                  key={cat.key}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    handleCategoryChange(cat.key);
-                  }}
-                  style={[
-                    styles.categoryButton,
-                    {
-                      backgroundColor: category === cat.key ? colors.primary : colors.surface,
-                      borderColor: category === cat.key ? colors.primary : colors.border,
-                    },
-                  ]}
-                >
-                  <MaterialIcons
-                    name={cat.icon as any}
-                    size={18}
-                    color={category === cat.key ? colors.background : colors.foreground}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-                      { color: category === cat.key ? colors.background : colors.foreground },
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Type Selector */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.typeGrid}>
-              {currentTypes.map((t) => (
-                <Pressable
-                  key={t.key}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setType(t.key);
-                  }}
-                  style={[
-                    styles.typePill,
-                    {
-                      backgroundColor: type === t.key ? colors.primary : colors.surface,
-                      borderColor: type === t.key ? colors.primary : colors.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.typeText,
-                      { color: type === t.key ? colors.background : colors.foreground },
-                    ]}
-                  >
-                    {t.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Color Selector */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Color</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.colorRow}>
-              {COLORS.map((c) => (
-                <Pressable
-                  key={c.name}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedColor(c.name);
-                  }}
-                  style={[
-                    styles.colorButton,
-                    {
-                      backgroundColor: c.hex,
-                      borderWidth: selectedColor === c.name ? 3 : 1,
-                      borderColor: selectedColor === c.name ? colors.primary : colors.border,
-                    },
-                  ]}
-                >
-                  {selectedColor === c.name && (
-                    <MaterialIcons
-                      name="check"
-                      size={16}
-                      color={c.name === "White" || c.name === "Beige" || c.name === "Cream" || c.name === "Yellow" ? "#000" : "#fff"}
-                    />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-          <Text style={[styles.colorLabel, { color: colors.muted }]}>{selectedColor}</Text>
-        </View>
-
-        {/* Brand Selector */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Brand</Text>
-          <Pressable
-            onPress={() => setShowBrandPicker(true)}
-            style={[styles.brandSelector, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <Text style={[styles.brandText, { color: brand ? colors.foreground : colors.muted }]}>
-              {brand || "Select or enter brand"}
-            </Text>
-            <MaterialIcons name="expand-more" size={20} color={colors.muted} />
-          </Pressable>
-        </View>
-
-        {/* Occasions */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Occasions</Text>
-          <View style={styles.occasionGrid}>
-            {OCCASIONS.map((occ) => (
-              <Pressable
-                key={occ.key}
-                onPress={() => toggleOccasion(occ.key)}
+                key={cat.key}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleCategoryChange(cat.key);
+                }}
                 style={[
-                  styles.occasionPill,
+                  styles.categoryButton,
                   {
-                    backgroundColor: selectedOccasions.includes(occ.key) ? colors.primary : colors.surface,
-                    borderColor: selectedOccasions.includes(occ.key) ? colors.primary : colors.border,
+                    backgroundColor: category === cat.key ? colors.primary : colors.surface,
+                    borderColor: category === cat.key ? colors.primary : colors.border,
                   },
                 ]}
               >
                 <MaterialIcons
-                  name={occ.icon as any}
-                  size={16}
-                  color={selectedOccasions.includes(occ.key) ? colors.background : colors.foreground}
+                  name={cat.icon as any}
+                  size={18}
+                  color={category === cat.key ? colors.background : colors.foreground}
                 />
                 <Text
                   style={[
-                    styles.occasionText,
-                    { color: selectedOccasions.includes(occ.key) ? colors.background : colors.foreground },
+                    styles.categoryButtonText,
+                    { color: category === cat.key ? colors.background : colors.foreground },
                   ]}
                 >
-                  {occ.label}
+                  {cat.label}
                 </Text>
               </Pressable>
             ))}
           </View>
-        </View>
+        </ScrollView>
+      </View>
 
-        {/* Seasons */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Seasons</Text>
-          <View style={styles.seasonGrid}>
-            {SEASONS.map((s) => (
+      {/* Type Selector */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Type</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.typeGrid}>
+            {currentTypes.map((t) => (
               <Pressable
-                key={s.key}
-                onPress={() => toggleSeason(s.key)}
+                key={t.key}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setType(t.key);
+                }}
                 style={[
-                  styles.seasonPill,
+                  styles.typePill,
                   {
-                    backgroundColor: selectedSeasons.includes(s.key) ? colors.primary : colors.surface,
-                    borderColor: selectedSeasons.includes(s.key) ? colors.primary : colors.border,
+                    backgroundColor: type === t.key ? colors.primary : colors.surface,
+                    borderColor: type === t.key ? colors.primary : colors.border,
                   },
                 ]}
               >
                 <Text
                   style={[
-                    styles.seasonText,
-                    { color: selectedSeasons.includes(s.key) ? colors.background : colors.foreground },
+                    styles.typeText,
+                    { color: type === t.key ? colors.background : colors.foreground },
                   ]}
                 >
-                  {s.label}
+                  {t.label}
                 </Text>
               </Pressable>
             ))}
           </View>
-        </View>
+        </ScrollView>
+      </View>
 
-        {/* Price Input */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Purchase Price</Text>
-          <TextInput
-            style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
-            placeholder="$0.00"
-            placeholderTextColor={colors.muted}
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
+      {/* Color Selector */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Color</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.colorRow}>
+            {COLORS.map((c) => (
+              <Pressable
+                key={c.name}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedColor(c.name);
+                }}
+                style={[
+                  styles.colorButton,
+                  {
+                    backgroundColor: c.hex,
+                    borderWidth: selectedColor === c.name ? 3 : 1,
+                    borderColor: selectedColor === c.name ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                {selectedColor === c.name && (
+                  <MaterialIcons
+                    name="check"
+                    size={16}
+                    color={c.name === "White" || c.name === "Beige" || c.name === "Cream" || c.name === "Yellow" ? "#000" : "#fff"}
+                  />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+        <Text style={[styles.colorLabel, { color: colors.muted }]}>{selectedColor}</Text>
+      </View>
+
+      {/* Brand Selector */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Brand</Text>
+        <Pressable
+          onPress={() => setShowBrandPicker(true)}
+          style={[styles.brandSelector, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Text style={[styles.brandText, { color: brand ? colors.foreground : colors.muted }]}>
+            {brand || "Select or enter brand"}
+          </Text>
+          <MaterialIcons name="expand-more" size={20} color={colors.muted} />
+        </Pressable>
+      </View>
+
+      {/* Occasions */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Occasions</Text>
+        <View style={styles.occasionGrid}>
+          {OCCASIONS.map((occ) => (
+            <Pressable
+              key={occ.key}
+              onPress={() => toggleOccasion(occ.key)}
+              style={[
+                styles.occasionPill,
+                {
+                  backgroundColor: selectedOccasions.includes(occ.key) ? colors.primary : colors.surface,
+                  borderColor: selectedOccasions.includes(occ.key) ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={occ.icon as any}
+                size={16}
+                color={selectedOccasions.includes(occ.key) ? colors.background : colors.foreground}
+              />
+              <Text
+                style={[
+                  styles.occasionText,
+                  { color: selectedOccasions.includes(occ.key) ? colors.background : colors.foreground },
+                ]}
+              >
+                {occ.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Seasons */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Seasons</Text>
+        <View style={styles.seasonGrid}>
+          {SEASONS.map((s) => (
+            <Pressable
+              key={s.key}
+              onPress={() => toggleSeason(s.key)}
+              style={[
+                styles.seasonPill,
+                {
+                  backgroundColor: selectedSeasons.includes(s.key) ? colors.primary : colors.surface,
+                  borderColor: selectedSeasons.includes(s.key) ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.seasonText,
+                  { color: selectedSeasons.includes(s.key) ? colors.background : colors.foreground },
+                ]}
+              >
+                {s.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Price Input */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Purchase Price</Text>
+        <TextInput
+          style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+          placeholder="$0.00"
+          placeholderTextColor={colors.muted}
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Tags Input */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags (Optional)</Text>
+        <TextInput
+          style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+          placeholder="favorite, vintage, gift (comma separated)"
+          placeholderTextColor={colors.muted}
+          value={tags}
+          onChangeText={setTags}
+          returnKeyType="done"
+        />
+      </View>
+
+      <View style={{ height: 40 }} />
+    </>
+  );
+
+  return (
+    <ScreenContainer edges={["top", "left", "right", "bottom"]}>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (step === "input" || step === "analyzing") {
+              router.back();
+            } else {
+              setStep("input");
+              setRecognitionError(null);
+            }
+          }}
+          style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.6 : 1 }]}
+        >
+          <MaterialIcons 
+            name={step === "input" || step === "analyzing" ? "close" : "arrow-back"} 
+            size={24} 
+            color={colors.foreground} 
           />
-        </View>
+        </Pressable>
+        <Text style={[styles.title, { color: colors.foreground }]}>
+          {step === "input" ? "Add Item" : step === "analyzing" ? "Analyzing..." : "Item Details"}
+        </Text>
+        {(step === "review" || step === "manual") ? (
+          <Pressable
+            onPress={handleSave}
+            disabled={saving || !imageUri}
+            style={({ pressed }) => [
+              styles.saveButton,
+              {
+                backgroundColor: colors.primary,
+                opacity: saving || !imageUri ? 0.5 : pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.saveText, { color: colors.background }]}>
+              {saving ? "Saving..." : "Save"}
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
+      </View>
 
-        {/* Tags Input */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags (Optional)</Text>
-          <TextInput
-            style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
-            placeholder="favorite, vintage, gift (comma separated)"
-            placeholderTextColor={colors.muted}
-            value={tags}
-            onChangeText={setTags}
-            returnKeyType="done"
-          />
-        </View>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      {step === "input" && renderInputStep()}
+      {step === "analyzing" && renderAnalyzingStep()}
+      {step === "review" && renderReviewStep()}
+      {step === "manual" && renderManualStep()}
 
       {/* Brand Picker Modal */}
       <Modal
@@ -550,6 +890,153 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  // Input step styles
+  inputStepContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  stepTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 16,
+    marginBottom: 32,
+  },
+  optionSection: {
+    marginBottom: 16,
+  },
+  optionLabel: {
+    fontSize: 17,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  optionDescription: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  imagePickerRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  imagePickerButton: {
+    flex: 1,
+    height: 100,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  urlInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    gap: 8,
+    marginBottom: 12,
+  },
+  urlInput: {
+    flex: 1,
+    fontSize: 15,
+  },
+  fetchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 44,
+    borderRadius: 22,
+    gap: 8,
+  },
+  fetchButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  manualButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  manualButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  // Analyzing step styles
+  analyzingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
+  analyzingText: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: 24,
+  },
+  analyzingSubtext: {
+    fontSize: 15,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  // Recognition banner
+  recognitionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+  },
+  recognitionBannerText: {
+    flex: 1,
+  },
+  recognitionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  recognitionSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  // Form styles
   section: {
     marginBottom: 24,
   },
@@ -576,24 +1063,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-  },
-  imagePickerRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  imagePickerButton: {
-    flex: 1,
-    height: 120,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  imagePickerText: {
-    fontSize: 14,
-    fontWeight: "500",
   },
   categoryGrid: {
     flexDirection: "row",
@@ -694,6 +1163,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+  // Modal styles
   modalContainer: {
     flex: 1,
   },

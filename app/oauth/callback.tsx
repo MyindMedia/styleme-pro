@@ -21,12 +21,18 @@ export default function OAuthCallback() {
         const currentUrl = Linking.useURL?.(); // useURL hook might not be available inside async
         
         // Use the URL that triggered this route
-        const activeUrl = currentUrl || url;
+        let activeUrl = currentUrl || url;
         
         console.log("[OAuth] Active URL:", activeUrl);
 
         if (!activeUrl) {
-          throw new Error("No URL found");
+          // If no URL, check if we are on web and have a hash
+          if (Platform.OS === 'web' && window.location.hash) {
+             console.log("[OAuth] Using window.location.hash on web");
+             activeUrl = window.location.href;
+          } else {
+             throw new Error("No URL found");
+          }
         }
 
         // Parse the URL

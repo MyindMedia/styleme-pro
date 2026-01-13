@@ -73,9 +73,12 @@ export default function LoginScreen() {
   }
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]}>
+    <ScreenContainer 
+      edges={["top", "left", "right", "bottom"]} 
+      style={{ backgroundColor: colors.background }} // Ensure background matches theme
+    >
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView

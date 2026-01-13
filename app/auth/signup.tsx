@@ -90,9 +90,12 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]}>
+    <ScreenContainer 
+      edges={["top", "left", "right", "bottom"]}
+      style={{ backgroundColor: colors.background }} // Ensure background matches theme
+    >
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
@@ -103,7 +106,7 @@ export default function SignupScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: "transparent" }]}>
-              <Image
+              <ExpoImage
                 source={require("@/assets/images/icon.png")}
                 style={{ width: 80, height: 80, borderRadius: 20 }}
                 contentFit="cover"

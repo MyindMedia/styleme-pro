@@ -152,12 +152,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign in with OAuth provider
   const signInWithOAuth = async (provider: "google" | "apple" | "facebook") => {
     try {
+      const redirectTo = typeof window !== "undefined"
+        ? `${window.location.origin}/oauth/callback`
+        : "styleme://oauth/callback";
+      
+      console.log(`[Auth] Initiating OAuth with ${provider}, redirecting to: ${redirectTo}`);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: typeof window !== "undefined"
-            ? `${window.location.origin}/oauth/callback`
-            : "styleme://oauth/callback",
+          redirectTo,
         },
       });
 

@@ -122,3 +122,8 @@
 - [x] Create CONTRIBUTING.md with code style guidelines and PR process
 - [x] Set up GitHub Actions for CI/CD (testing, type checking)
 - [x] Create ENV_SETUP.md with environment variable documentation
+
+## GitHub Repository Setup (User Request)
+- [ ] Enable GitHub Actions workflow
+- [ ] Add README with CI status badge
+- [ ] Set up branch protection rules

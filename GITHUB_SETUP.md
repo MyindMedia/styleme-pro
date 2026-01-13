@@ -253,3 +253,193 @@ After completing this setup, your repository will have:
 | Protected main branch | ✅ |
 
 This ensures code quality and prevents broken code from being merged.
+
+---
+
+## 4. Set Up Dependabot for Automatic Dependency Updates
+
+Dependabot automatically creates pull requests to keep your dependencies up-to-date and secure.
+
+### Step 1: Create the Dependabot Configuration File
+
+1. Go to your repository: https://github.com/MyindMedia/styleme-pro
+2. Click **Add file** → **Create new file**
+3. Name the file: `.github/dependabot.yml`
+4. Paste the following content:
+
+```yaml
+# Dependabot configuration for FitCheck
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # NPM dependencies (main app)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+    groups:
+      # Group Expo-related updates together
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group React Native updates together
+      react-native:
+        patterns:
+          - "react-native*"
+          - "@react-native/*"
+          - "@react-navigation/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group TypeScript-related updates
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Ignore major version updates for critical packages (review manually)
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
+```
+
+5. Click **Commit changes** → **Commit directly to the main branch** → **Commit changes**
+
+### Step 2: Enable Dependabot Security Updates
+
+1. Go to your repository **Settings**
+2. Click **Code security and analysis** in the left sidebar
+3. Enable the following:
+
+| Feature | Action |
+|---------|--------|
+| **Dependency graph** | ✅ Enable |
+| **Dependabot alerts** | ✅ Enable |
+| **Dependabot security updates** | ✅ Enable |
+
+### Step 3: Configure Dependabot Alerts (Optional)
+
+To receive notifications about security vulnerabilities:
+
+1. Go to **Settings** → **Code security and analysis**
+2. Under "Dependabot alerts", click **Configure**
+3. Choose notification preferences (email, web, etc.)
+
+### How Dependabot Works
+
+| What It Does | Frequency |
+|--------------|----------|
+| Checks for npm package updates | Weekly (Mondays) |
+| Checks for GitHub Actions updates | Weekly (Mondays) |
+| Creates PRs for security vulnerabilities | Immediately |
+| Groups related updates together | Automatic |
+
+### Dependabot PR Workflow
+
+When Dependabot creates a PR:
+
+1. **Review the changelog** - Click "Release notes" in the PR description
+2. **Check CI status** - Ensure all checks pass
+3. **Merge or close** - Merge if safe, close if breaking changes detected
+
+### Customizing Update Behavior
+
+| Setting | Current Value | Options |
+|---------|---------------|----------|
+| Update frequency | Weekly | daily, weekly, monthly |
+| Max open PRs | 10 | 1-100 |
+| Auto-merge | Disabled | Can enable via GitHub Actions |
+| Grouped updates | Enabled | Reduces PR noise |
+
+---
+
+## 5. Optional: Auto-Merge Dependabot PRs
+
+To automatically merge low-risk Dependabot updates, add this workflow:
+
+1. Create file: `.github/workflows/dependabot-auto-merge.yml`
+2. Paste:
+
+```yaml
+name: Dependabot Auto-Merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Auto-merge patch and minor updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+This will auto-merge patch and minor updates after CI passes.
+
+---
+
+## Complete Setup Summary
+
+After completing all sections, your repository will have:
+
+| Feature | Status |
+|---------|--------|
+| Automated CI/CD | ✅ |
+| Branch protection | ✅ |
+| Dependabot version updates | ✅ |
+| Dependabot security alerts | ✅ |
+| Grouped dependency PRs | ✅ |
+| Auto-merge (optional) | ⚙️ |

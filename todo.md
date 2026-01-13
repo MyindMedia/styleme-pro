@@ -127,3 +127,7 @@
 - [ ] Enable GitHub Actions workflow (requires manual setup - see instructions below)
 - [x] Add README with CI status badge
 - [ ] Set up branch protection rules (requires manual setup in GitHub)
+
+## Dependabot Setup (User Request)
+- [x] Create dependabot.yml configuration (in GITHUB_SETUP.md)
+- [x] Add setup instructions to GITHUB_SETUP.md

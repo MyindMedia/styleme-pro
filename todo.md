@@ -111,3 +111,9 @@
 - [x] Add product URL input as fallback to scrape item details from store pages
 - [x] Implement manual input fallback when both methods fail
 - [x] Update add-item screen with recognition flow
+
+## Documentation (User Request)
+- [x] Create info.md with app overview, architecture, and structure
+- [x] Document all features and their locations
+- [x] Add changelog tracking all updates
+- [x] Include development setup instructions

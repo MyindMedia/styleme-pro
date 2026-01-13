@@ -9,21 +9,51 @@ type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof Materia
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ * SF Symbols to Material Icons mappings for StyleMe Pro
  */
 const MAPPING = {
+  // Tab icons
   "house.fill": "home",
-  "paperplane.fill": "send",
-  "chevron.left.forwardslash.chevron.right": "code",
+  "hanger": "checkroom",
+  "wand.and.stars": "auto-awesome",
+  "calendar": "event",
+  "person.2.fill": "groups",
+  "person.fill": "person",
+  // Action icons
+  "plus": "add",
+  "plus.circle.fill": "add-circle",
+  "camera.fill": "camera-alt",
+  "photo.fill": "photo-library",
+  "heart.fill": "favorite",
+  "heart": "favorite-border",
+  "bookmark.fill": "bookmark",
+  "bookmark": "bookmark-border",
+  "magnifyingglass": "search",
+  "slider.horizontal.3": "tune",
+  "xmark": "close",
+  "checkmark": "check",
   "chevron.right": "chevron-right",
+  "chevron.left": "chevron-left",
+  "chevron.down": "expand-more",
+  "ellipsis": "more-horiz",
+  "trash.fill": "delete",
+  "pencil": "edit",
+  "square.and.arrow.up": "share",
+  "gearshape.fill": "settings",
+  "tag.fill": "local-offer",
+  "dollarsign.circle.fill": "attach-money",
+  "chart.bar.fill": "bar-chart",
+  "arrow.clockwise": "refresh",
+  "sparkles": "auto-awesome",
+  "tshirt.fill": "checkroom",
+  "shoe.fill": "ice-skating",
+  "bag.fill": "shopping-bag",
+  "eyeglasses": "visibility",
+  "crown.fill": "workspace-premium",
 } as IconMapping;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
  */
 export function IconSymbol({
   name,

@@ -15,6 +15,7 @@ import { useRouter, Link } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -101,8 +102,12 @@ export default function SignupScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-              <MaterialIcons name="checkroom" size={40} color={colors.background} />
+            <View style={[styles.logoContainer, { backgroundColor: "transparent" }]}>
+              <Image
+                source={require("@/assets/images/icon.png")}
+                style={{ width: 80, height: 80, borderRadius: 20 }}
+                contentFit="cover"
+              />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>

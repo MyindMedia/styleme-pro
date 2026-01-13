@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useRouter, Link } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -84,8 +85,12 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-              <MaterialIcons name="checkroom" size={40} color={colors.background} />
+            <View style={[styles.logoContainer, { backgroundColor: "transparent" }]}>
+              <ExpoImage
+                source={require("@/assets/images/icon.png")}
+                style={{ width: 80, height: 80, borderRadius: 20 }}
+                contentFit="cover"
+              />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Welcome Back</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>

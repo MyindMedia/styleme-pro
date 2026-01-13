@@ -113,6 +113,8 @@ export default function OAuthCallback() {
         }
 
         setStatus("success");
+        console.log("[OAuth] Success! Redirecting to tabs...");
+        // Add a small delay to ensure session is propagated
         setTimeout(() => {
           router.replace("/(tabs)");
         }, 1000);

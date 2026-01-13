@@ -10,6 +10,7 @@ import {
   Switch,
   Linking,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -189,8 +190,12 @@ export default function ProfileScreen() {
 
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.background }]}>FC</Text>
+          <View style={[styles.avatar, { backgroundColor: "transparent" }]}>
+            <Image
+              source={require("@/assets/images/icon.png")}
+              style={{ width: 56, height: 56, borderRadius: 28 }}
+              contentFit="cover"
+            />
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.foreground }]}>

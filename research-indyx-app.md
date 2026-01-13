@@ -63,9 +63,9 @@ Indyx is a digital wardrobe and styling app that focuses on cataloging, styling,
 - Indyx: More analytics, resale marketplace
 - Acloset: AI-powered outfit suggestions
 
-## Features to Add to StyleMe Pro
+## Features to Add to FitCheck
 
-Based on research, these features would differentiate StyleMe Pro:
+Based on research, these features would differentiate FitCheck:
 
 ### High Priority (Users actively requesting)
 1. **Outfit Randomizer/Shuffle**: Swipe to mix and match items
@@ -87,7 +87,7 @@ Based on research, these features would differentiate StyleMe Pro:
 13. **Style Quiz**: Help users define their style profile
 14. **Seasonal Rotation**: Archive off-season items
 
-## Key Differentiators for StyleMe Pro
+## Key Differentiators for FitCheck
 
 1. **AI-First Approach**: Unlike Indyx which relies on manual outfit creation or paid human stylists, we offer AI outfit generation for free
 2. **Smart Packing**: Weather/climate-based packing lists (Indyx doesn't have this)

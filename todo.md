@@ -1,4 +1,4 @@
-# StyleMe Pro - Project TODO
+# FitCheck - Project TODO
 
 ## Core Setup
 - [ ] Update theme colors to high-fashion minimalist palette
@@ -82,7 +82,7 @@
 ## Indyx App Research (User Request)
 - [x] Research Indyx app features
 - [x] Analyze user reviews for pain points and feature requests
-- [x] Identify features to add to StyleMe Pro
+- [x] Identify features to add to FitCheck
 
 ## Features from Indyx Research (To Implement)
 - [x] Outfit Randomizer/Shuffle - swipe to mix and match items
@@ -94,8 +94,13 @@
 - [ ] Inspiration boards for saving outfit ideas
 
 ## GitHub & Supabase Integration (User Request)
-- [x] Create GitHub repository for StyleMe Pro
+- [x] Create GitHub repository for FitCheck
 - [x] Push code to GitHub
 - [x] Configure Supabase as database
 - [x] Set up Supabase tables for clothing items, outfits, wishlist, trips
 - [x] Update app to use Supabase for cloud sync
+
+## App Rename (User Request)
+- [x] Update app name to "FitCheck" in app.config.ts
+- [x] Update branding title in webdev secrets
+- [x] Update any hardcoded references in the app

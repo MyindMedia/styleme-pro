@@ -9,7 +9,7 @@ type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof Materia
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
- * SF Symbols to Material Icons mappings for StyleMe Pro
+ * SF Symbols to Material Icons mappings for FitCheck
  */
 const MAPPING = {
   // Tab icons

@@ -1,8 +1,8 @@
-# StyleMe Pro - Mobile App Interface Design
+# FitCheck - Mobile App Interface Design
 
 ## Design Philosophy
 
-StyleMe Pro follows the **$50k MRR Framework** principles:
+FitCheck follows the **$50k MRR Framework** principles:
 - **High-Intent Input**: Photo scanning of clothing items
 - **Premium Insight**: AI-powered outfit recommendations and closet valuation
 - **Simple Interface**: One-tap actions, minimalist luxury aesthetic

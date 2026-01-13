@@ -2,6 +2,9 @@
   command = "npm run build:web"
   publish = "dist"
 
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "EXPO_PUBLIC_SUPABASE_ANON_KEY,EXPO_PUBLIC_SUPABASE_URL,REMOVE_BG_API_KEY"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

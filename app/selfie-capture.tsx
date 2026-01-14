@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  SafeAreaView,
   FlatList,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
 import { supabase, supabaseHelpers, DbClothingItem, DbOutfit, DbWishlistItem, DbTrip, DbOutfitLog } from "./supabase";
 
 // ============ Types ============
@@ -498,6 +499,51 @@ async function setStorageItem<T>(key: string, value: T): Promise<void> {
 // ============ Sync Helpers ============
 
 /**
+ * Ensures a local image URI is persistent by copying it to the document directory.
+ * Useful for images from cache (ImagePicker) or temporary processing.
+ */
+async function persistImage(uri: string): Promise<string> {
+  if (!uri || typeof uri !== 'string') return uri;
+  
+  // Skip remote URLs and base64
+  if (uri.startsWith("http") || uri.startsWith("https") || uri.startsWith("data:")) return uri;
+
+  // If we are on web, FileSystem might not work as expected for persistence, just return uri
+  if (typeof window !== "undefined" && window.document) return uri;
+
+  // If it's already in the document directory, we're good
+  if (FileSystem.documentDirectory && uri.includes(FileSystem.documentDirectory)) {
+    return uri;
+  }
+
+  try {
+    // Create a unique filename
+    const ext = uri.split('.').pop() || 'jpg';
+    const filename = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    const newPath = `${FileSystem.documentDirectory}${filename}`;
+
+    // Check if file exists at source
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      console.warn(`[Storage] Source image does not exist: ${uri}`);
+      return uri;
+    }
+
+    // Copy to document directory
+    await FileSystem.copyAsync({
+      from: uri,
+      to: newPath
+    });
+
+    console.log(`[Storage] Persisted image to: ${newPath}`);
+    return newPath;
+  } catch (error) {
+    console.error("[Storage] Failed to persist image:", error);
+    return uri;
+  }
+}
+
+/**
  * Checks if a URI is local and uploads it to Supabase if authenticated.
  * Returns the remote URL or the original URI if upload fails or is not needed.
  */
@@ -534,24 +580,30 @@ export async function getClothingItems(): Promise<ClothingItem[]> {
   return getStorageItem(STORAGE_KEYS.ITEMS, []);
 }
 
-export async function saveClothingItem(item: ClothingItem): Promise<void> {
+export async function saveClothingItem(item: ClothingItem): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession();
+
+  // Persist image locally first (in case upload fails or for offline use)
+  const persistentUri = await persistImage(item.imageUri);
+  const itemWithPersistentImage = { ...item, imageUri: persistentUri };
 
   if (session?.user) {
     // Ensure image is uploaded if it's local
-    const remoteUri = await uploadIfLocal(item.imageUri, session.user.id, "clothing");
-    const itemToSave = { ...item, imageUri: remoteUri };
+    const remoteUri = await uploadIfLocal(persistentUri, session.user.id, "clothing");
+    const itemToSave = { ...itemWithPersistentImage, imageUri: remoteUri };
 
-    await supabaseHelpers.saveClothingItem(mapToDbClothingItem(itemToSave, session.user.id) as any);
+    const saved = await supabaseHelpers.saveClothingItem(mapToDbClothingItem(itemToSave, session.user.id) as any);
+    return !!saved;
   } else {
     const items = await getClothingItems();
     const existingIndex = items.findIndex((i) => i.id === item.id);
     if (existingIndex >= 0) {
-      items[existingIndex] = item;
+      items[existingIndex] = itemWithPersistentImage;
     } else {
-      items.unshift(item);
+      items.unshift(itemWithPersistentImage);
     }
     await setStorageItem(STORAGE_KEYS.ITEMS, items);
+    return true;
   }
 }
 

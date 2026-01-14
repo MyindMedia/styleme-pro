@@ -171,10 +171,10 @@ export default function OnboardingScreen() {
         </View>
 
         {/* Title & Description */}
-        <Text style={[styles.title, { color: colors.foreground }]}>
+        <Text style={[styles.title, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
           {item.title}
         </Text>
-        <Text style={[styles.description, { color: colors.muted }]}>
+        <Text style={[styles.description, { color: colors.muted, fontFamily: 'PlayfairDisplay_400Regular' }]}>
           {item.description}
         </Text>
 
@@ -185,7 +185,7 @@ export default function OnboardingScreen() {
               <View style={[styles.checkCircle, { backgroundColor: colors.primary }]}>
                 <MaterialIcons name="check" size={14} color="#fff" />
               </View>
-              <Text style={[styles.featureText, { color: colors.foreground }]}>
+              <Text style={[styles.featureText, { color: colors.foreground, fontFamily: 'PlayfairDisplay_400Regular' }]}>
                 {feature}
               </Text>
             </View>
@@ -322,8 +322,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   skipText: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 14,
+    fontFamily: 'PlayfairDisplay_500Medium',
   },
   slidesContainer: {
     flex: 1,
@@ -348,17 +348,18 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 32,
     textAlign: "center",
-    marginBottom: 12,
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 16,
+    fontFamily: 'PlayfairDisplay_700Bold',
+    letterSpacing: 0.5,
   },
   description: {
     fontSize: 16,
     textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
+    fontFamily: 'PlayfairDisplay_400Regular',
   },
   featuresContainer: {
     width: "100%",
@@ -380,6 +381,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
     lineHeight: 22,
+    fontFamily: 'PlayfairDisplay_400Regular',
   },
   pagination: {
     flexDirection: "row",
@@ -403,8 +405,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nextButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 1,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
   },
   finalButtons: {
     gap: 12,
@@ -416,8 +419,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 1,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
   },
   secondaryButton: {
     height: 56,
@@ -427,7 +431,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   secondaryButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 1,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
   },
 });

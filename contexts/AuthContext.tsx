@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 import { Alert, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import Purchases, { LOG_LEVEL, PurchasesPackage } from "react-native-purchases";
+import RevenueCatUI from "react-native-purchases-ui";
 import { syncLocalStorageToCloud } from "@/lib/storage";
 
 // User profile type
@@ -14,6 +16,7 @@ export interface UserProfile {
   avatar_url: string | null;
   storage_used: number;
   storage_limit: number;
+  is_pro: boolean;
   preferences: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -27,7 +30,8 @@ interface AuthContextType {
   profile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  isPro: boolean; // Mocked Pro status
+  isPro: boolean;
+  offerings: PurchasesPackage[];
 
   // Auth methods
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
@@ -42,6 +46,8 @@ interface AuthContextType {
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
   upgradeToPro: () => Promise<void>; // Mock upgrade
+  showPaywall: () => Promise<void>; // RevenueCat Paywall
+  presentCustomerCenter: () => Promise<void>; // RevenueCat Customer Center
 
   // Storage helpers
   getUserStoragePath: () => string;
@@ -56,13 +62,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPro, setIsPro] = useState(false); // Default to free
+  const [offerings, setOfferings] = useState<PurchasesPackage[]>([]);
 
   const isAuthenticated = !!user && !!session;
 
+  // Initialize RevenueCat
+  useEffect(() => {
+    const initRevenueCat = async () => {
+      if (Platform.OS === "web") return;
+
+      const apiKey = Platform.select({
+        ios: process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY,
+        android: process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY,
+      });
+
+      if (!apiKey) {
+        console.warn("RevenueCat API key not found");
+        return;
+      }
+
+      try {
+        Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+        await Purchases.configure({ apiKey });
+        
+        // Get initial customer info
+        const customerInfo = await Purchases.getCustomerInfo();
+        if (customerInfo.entitlements.active["pro"]) {
+          setIsPro(true);
+        }
+
+        // Get offerings
+        const offerings = await Purchases.getOfferings();
+        if (offerings.current && offerings.current.availablePackages.length !== 0) {
+          setOfferings(offerings.current.availablePackages);
+        }
+      } catch (e) {
+        console.log("Error initializing RevenueCat", e);
+      }
+    };
+
+    initRevenueCat();
+  }, []);
+
   // Mock function to upgrade user
   const upgradeToPro = async () => {
+    if (!user) return;
+    
+    // Optimistic update
     setIsPro(true);
-    Alert.alert("Welcome to Pro!", "You now have access to all premium features.");
+    
+    try {
+      await supabase
+        .from("user_profiles")
+        .update({ is_pro: true })
+        .eq("id", user.id);
+        
+      Alert.alert("Welcome to Pro!", "You now have access to all premium features.");
+      refreshProfile();
+    } catch (error) {
+      console.error("Error upgrading to pro:", error);
+      setIsPro(false);
+      Alert.alert("Error", "Could not upgrade account. Please try again.");
+    }
   };
 
   // Fetch user profile from database
@@ -83,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           avatar_url: null,
           storage_used: 0,
           storage_limit: 104857600, // 100MB
+          is_pro: false,
           preferences: {},
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -119,11 +181,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userProfile = await fetchProfile(session.user);
         if (isMounted) {
           setProfile(userProfile);
+          if (userProfile) setIsPro(userProfile.is_pro || false);
         }
       } else {
         setSession(null);
         setUser(null);
         setProfile(null);
+        setIsPro(false);
       }
 
       if (isMounted) {
@@ -149,9 +213,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userProfile = await fetchProfile(session.user);
           if (isMounted) {
             setProfile(userProfile);
+            if (userProfile) setIsPro(userProfile.is_pro || false);
           }
           // Sync local storage to cloud
           if (event === "SIGNED_IN") {
+            // Identify user in RevenueCat
+            if (Platform.OS !== "web") {
+              try {
+                await Purchases.logIn(session.user.id);
+                const customerInfo = await Purchases.getCustomerInfo();
+                if (customerInfo.entitlements.active["pro"]) {
+                  setIsPro(true);
+                }
+              } catch (e) {
+                console.log("Error logging into RevenueCat", e);
+              }
+            }
+
             syncLocalStorageToCloud().then(result => {
               if (result.success && result.itemsCount > 0) {
                 console.log(`[Auth] Synced ${result.itemsCount} local items to cloud`);
@@ -160,6 +238,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           setProfile(null);
+          // Logout from RevenueCat
+          if (Platform.OS !== "web" && event === "SIGNED_OUT") {
+            try {
+              await Purchases.logOut();
+            } catch (e) {
+              console.log("Error logging out of RevenueCat", e);
+            }
+          }
         }
 
         setIsLoading(false);
@@ -405,6 +491,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Show RevenueCat Paywall
+  const showPaywall = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Not Supported", "Paywalls are not supported on web.");
+      return;
+    }
+
+    try {
+      const paywallResult = await RevenueCatUI.presentPaywall();
+      
+      switch (paywallResult) {
+        case RevenueCatUI.PAYWALL_RESULT.PURCHASED:
+        case RevenueCatUI.PAYWALL_RESULT.RESTORED:
+          await upgradeToPro(); // Sync our database
+          return;
+        case RevenueCatUI.PAYWALL_RESULT.NOT_PRESENTED:
+        case RevenueCatUI.PAYWALL_RESULT.ERROR:
+        case RevenueCatUI.PAYWALL_RESULT.CANCELLED:
+        default:
+          return;
+      }
+    } catch (e) {
+      console.error("Error presenting paywall:", e);
+    }
+  };
+
+  // Present Customer Center
+  const presentCustomerCenter = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Not Supported", "Customer Center is not supported on web.");
+      return;
+    }
+
+    try {
+      await RevenueCatUI.presentCustomerCenter();
+    } catch (e) {
+      console.error("Error presenting customer center:", e);
+    }
+  };
+
   // Get user's storage path (for organizing files by user)
   const getUserStoragePath = () => {
     if (!user) return "public";
@@ -436,6 +562,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     upgradeToPro,
     getUserStoragePath,
     getStorageUsagePercent,
+    offerings,
+    showPaywall,
+    presentCustomerCenter,
   };
 
   return (

@@ -120,69 +120,44 @@ export default function ClosetScreen() {
 
   const renderHeader = () => (
     <View style={styles.headerSection}>
-      {/* User Greeting */}
-      <View style={styles.greetingRow}>
-        <View style={[styles.avatar, { backgroundColor: colors.surface }]}>
-          <MaterialIcons name="person" size={20} color={colors.muted} />
-        </View>
-        <View style={styles.greetingText}>
-          <Text style={[styles.greeting, { color: colors.foreground }]}>Hi there!</Text>
-          <Text style={[styles.subGreeting, { color: colors.muted }]}>Welcome back</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable style={[styles.iconButton, { backgroundColor: colors.surface }]}>
-            <MaterialIcons name="search" size={20} color={colors.foreground} />
-          </Pressable>
-          <Pressable
-            onPress={handleAddItem}
-            style={[styles.iconButton, { backgroundColor: colors.primary }]}
-          >
-            <MaterialIcons name="add" size={20} color={colors.background} />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.quickActionsRow}>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/shuffle" as any);
-          }}
-          style={({ pressed }) => [
-            styles.quickActionCard,
-            { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
-          ]}
-        >
-          <MaterialIcons name="shuffle" size={22} color={colors.primary} />
-          <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Shuffle</Text>
+      {/* Top Bar */}
+      <View style={styles.topBar}>
+        <Pressable style={styles.iconButton}>
+          <MaterialIcons name="menu" size={24} color={colors.foreground} />
         </Pressable>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/wishlist" as any);
-          }}
-          style={({ pressed }) => [
-            styles.quickActionCard,
-            { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
-          ]}
-        >
-          <MaterialIcons name="favorite" size={22} color="#ED64A6" />
-          <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Wishlist</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>HOME</Text>
+        <Pressable style={styles.iconButton} onPress={() => router.push("/profile")}>
+          <MaterialIcons name="person-outline" size={24} color={colors.foreground} />
         </Pressable>
       </View>
 
-      {/* Section Title */}
+      {/* Search Bar */}
+      <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+        <MaterialIcons name="search" size={20} color={colors.muted} />
+        <Text style={[styles.searchText, { color: colors.muted }]}>Search</Text>
+      </View>
+
+      {/* Featured Banner (Mocking "New Season" from design) */}
+      <View style={[styles.bannerCard, { backgroundColor: "#E5E5E5" }]}>
+        <View style={styles.bannerContent}>
+          <Text style={[styles.bannerTitle, { fontFamily: 'PlayfairDisplay_700Bold' }]}>NEW SEASON NOW</Text>
+          <Text style={[styles.bannerSubtitle, { fontFamily: 'PlayfairDisplay_400Regular' }]}>50% OFF</Text>
+          <Pressable style={styles.bannerButton}>
+             <Text style={styles.bannerButtonText}>SHOP NOW</Text>
+          </Pressable>
+        </View>
+        {/* Placeholder for image */}
+        <View style={styles.bannerImagePlaceholder} />
+      </View>
+
+      {/* Categories */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>My Closet</Text>
-        <Text style={[styles.seeAll, { color: colors.muted }]}>
-          {items.length} items
-        </Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>CATEGORIES</Text>
+        <Text style={[styles.seeAll, { color: colors.muted }]}>SEE ALL</Text>
       </View>
 
-      {/* Category Pills */}
       <FlatList
-        data={CATEGORIES}
+        data={CATEGORIES.filter(c => c.key !== 'all')} // Show specific categories
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.categoryList}
@@ -193,28 +168,33 @@ export default function ClosetScreen() {
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSelectedCategory(item.key);
+                setSelectedCategory(item.key === selectedCategory ? 'all' : item.key);
               }}
               style={[
-                styles.categoryPill,
+                styles.categoryCard,
                 {
-                  backgroundColor: isSelected ? colors.primary : colors.surface,
-                  borderColor: isSelected ? colors.primary : colors.border,
+                  backgroundColor: isSelected ? colors.primary : '#D4D4D4', // Grey from design
                 },
               ]}
             >
               <Text
                 style={[
-                  styles.categoryText,
-                  { color: isSelected ? colors.background : colors.foreground },
+                  styles.categoryCardText,
+                  { color: isSelected ? "#fff" : "#fff", fontFamily: 'PlayfairDisplay_600SemiBold' },
                 ]}
               >
-                {item.label}
+                {item.label.toUpperCase()}
               </Text>
             </Pressable>
           );
         }}
       />
+
+      {/* Popular / My Closet */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>POPULAR</Text>
+        <Text style={[styles.seeAll, { color: colors.muted }]}>SEE ALL</Text>
+      </View>
     </View>
   );
 
@@ -237,29 +217,19 @@ export default function ClosetScreen() {
           contentFit="cover"
           transition={200}
         />
-        {/* Add to cart style button */}
-        <Pressable style={[styles.quickAction, { backgroundColor: colors.background }]}>
-          <MaterialIcons name="favorite-border" size={16} color={colors.foreground} />
+        {/* Heart Icon */}
+        <Pressable style={styles.heartIcon}>
+          <MaterialIcons name="favorite-border" size={20} color="#fff" />
         </Pressable>
       </View>
 
       <View style={styles.itemInfo}>
-        <Text style={[styles.itemBrand, { color: colors.foreground }]} numberOfLines={1}>
-          {item.brand || "Unknown Brand"}
+        <Text style={[styles.itemBrand, { color: colors.foreground, fontFamily: 'PlayfairDisplay_600SemiBold' }]} numberOfLines={1}>
+          {item.brand || "Brand"}
         </Text>
         <Text style={[styles.itemCategory, { color: colors.muted }]} numberOfLines={1}>
-          {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+          {item.category.toUpperCase()}
         </Text>
-        <View style={styles.priceRow}>
-          <Text style={[styles.itemPrice, { color: colors.foreground }]}>
-            ${item.purchasePrice.toFixed(2)}
-          </Text>
-          {item.wearCount > 0 && (
-            <Text style={[styles.wearCount, { color: colors.muted }]}>
-              {item.wearCount}x worn
-            </Text>
-          )}
-        </View>
       </View>
     </Pressable>
   );
@@ -336,154 +306,158 @@ const styles = StyleSheet.create({
   headerSection: {
     paddingBottom: 8,
   },
-  greetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 20,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  greetingText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  greeting: {
-    fontSize: 18,
-    fontWeight: "700",
-    fontFamily: "System",
-  },
-  subGreeting: {
-    fontSize: 13,
-    marginTop: 1,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 10,
+  headerTitle: {
+    fontSize: 20,
+    letterSpacing: 2,
   },
   iconButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickActionsRow: {
-    flexDirection: "row",
+  searchBar: {
+    marginHorizontal: 16,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  quickActionCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
-  },
-  quickActionLabel: {
+  searchText: {
     fontSize: 14,
-    fontWeight: "600",
+  },
+  bannerCard: {
+    marginHorizontal: 16,
+    height: 200,
+    borderRadius: 0, // Sharp
+    marginBottom: 32,
+    padding: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  bannerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  bannerTitle: {
+    fontSize: 24,
+    marginBottom: 8,
+    color: '#000',
+    width: '80%',
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    marginBottom: 24,
+    color: '#666',
+  },
+  bannerButton: {
+    backgroundColor: '#000',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignSelf: 'flex-start',
+    borderRadius: 0,
+  },
+  bannerButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  bannerImagePlaceholder: {
+    position: 'absolute',
+    right: -20,
+    bottom: -20,
+    width: 150,
+    height: 200,
+    backgroundColor: '#D4D4D4',
+    transform: [{ rotate: '15deg' }],
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    letterSpacing: -0.5,
+    fontSize: 18,
+    letterSpacing: 1,
   },
   seeAll: {
-    fontSize: 14,
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textDecorationLine: 'underline',
   },
   categoryList: {
     paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 32,
   },
-  categoryPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    marginRight: 8,
+  categoryCard: {
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 0, // Sharp
   },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: "600",
+  categoryCardText: {
+    fontSize: 12,
+    letterSpacing: 1,
+    marginTop: 8,
   },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 120,
   },
   row: {
-    gap: 12,
-    marginBottom: 12,
+    gap: 16,
+    marginBottom: 16,
   },
   itemCard: {
     width: CARD_WIDTH,
-    borderRadius: 16,
-    overflow: "hidden",
+    marginBottom: 8,
   },
   imageContainer: {
     position: "relative",
+    marginBottom: 12,
   },
   itemImage: {
     width: "100%",
-    height: CARD_WIDTH * 1.2,
-    borderRadius: 16,
+    height: CARD_WIDTH * 1.3, // Taller images
+    borderRadius: 0, // Sharp
   },
-  quickAction: {
-    position: "absolute",
-    bottom: 10,
+  heartIcon: {
+    position: 'absolute',
+    top: 10,
     right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   itemInfo: {
-    padding: 12,
+    paddingHorizontal: 4,
   },
   itemBrand: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 14,
+    marginBottom: 4,
   },
   itemCategory: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  wearCount: {
     fontSize: 12,
+    letterSpacing: 1,
   },
+  // Keep empty state and fab
   emptyState: {
     flex: 1,
     alignItems: "center",

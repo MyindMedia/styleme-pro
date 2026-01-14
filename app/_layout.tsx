@@ -20,6 +20,17 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { registerForPushNotificationsAsync } from "@/lib/notifications";
+import {
+  useFonts,
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_700Bold,
+} from "@expo-google-fonts/playfair-display";
+import * as SplashScreen from 'expo-splash-screen';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -83,6 +94,19 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
@@ -90,6 +114,7 @@ export default function RootLayout() {
   const [frame, setFrame] = useState<Rect>(initialFrame);
 
   // Initialize Manus runtime for cookie injection from parent container
+
   useEffect(() => {
     initManusRuntime();
   }, []);
@@ -111,9 +136,7 @@ export default function RootLayout() {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Disable automatic refetching on window focus for mobile
             refetchOnWindowFocus: false,
-            // Retry failed requests once
             retry: 1,
           },
         },
@@ -133,6 +156,10 @@ export default function RootLayout() {
       },
     };
   }, [initialInsets, initialFrame]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>

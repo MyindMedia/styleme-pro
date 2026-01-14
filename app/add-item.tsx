@@ -472,9 +472,19 @@ export default function AddItemScreen() {
       } : undefined,
     };
 
-    await saveClothingItem(newItem);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    const success = await saveClothingItem(newItem);
+    
+    if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } else {
+      setSaving(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        "Save Failed", 
+        "Could not save your item. Please check your internet connection and try again."
+      );
+    }
   };
 
   const currentTypes = CLOTHING_TYPES[category] || [];
@@ -812,21 +822,12 @@ export default function AddItemScreen() {
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={[styles.bgRemovalText, { color: colors.foreground }]}>Remove Background</Text>
-                  {!isPro && (
-                    <View style={{ backgroundColor: "#FFD700", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "bold", color: "black" }}>PRO</Text>
-                    </View>
-                  )}
                 </View>
-                {!isPro && <Text style={{ fontSize: 11, color: colors.muted }}>Upgrade to enable AI removal</Text>}
+                <Text style={{ fontSize: 11, color: colors.muted }}>Automatically remove background from your item</Text>
               </View>
               <Switch
                 value={removeBackground}
                 onValueChange={(val) => {
-                  if (val && !isPro) {
-                    router.push("/paywall" as any);
-                    return;
-                  }
                   setRemoveBackground(val);
                   if (val) {
                     processBackgroundRemoval(originalImageUri);

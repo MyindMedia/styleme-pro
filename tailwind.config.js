@@ -22,6 +22,11 @@ module.exports = {
   theme: {
     extend: {
       colors: tailwindColors,
+      fontFamily: {
+        playfair: ["PlayfairDisplay_400Regular"],
+        "playfair-medium": ["PlayfairDisplay_500Medium"],
+        "playfair-bold": ["PlayfairDisplay_700Bold"],
+      },
     },
   },
   plugins: [

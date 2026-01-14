@@ -39,7 +39,16 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const { user, profile, isAuthenticated, isPro, signOut, upgradeToPro } = useAuth();
+  const {
+    user,
+    profile,
+    isAuthenticated,
+    isPro,
+    signOut,
+    upgradeToPro,
+    presentCustomerCenter,
+    showPaywall,
+  } = useAuth();
   const [_darkMode, setDarkMode] = useState(false);
 
   const loadStats = useCallback(async () => {
@@ -161,14 +170,7 @@ export default function ProfileScreen() {
       Alert.alert("Pro Active", "You are already a Pro member! Thank you for your support.");
       return;
     }
-    Alert.alert(
-      "Upgrade to Pro",
-      "Unlock premium features:\n\n✓ Unlimited closet items\n✓ Virtual Try-On\n✓ Advanced AI styling\n✓ Priority support\n✓ No ads",
-      [
-        { text: "Maybe Later", style: "cancel" },
-        { text: "Subscribe", onPress: () => upgradeToPro() },
-      ]
-    );
+    showPaywall();
   };
 
   const handleSignOut = () => {
@@ -189,9 +191,9 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { icon: "person-outline", label: "Edit Profile", action: handleEditProfile },
+    ...(isPro ? [{ icon: "card-membership", label: "Manage Subscription", action: presentCustomerCenter }] : []),
     { icon: "notifications-none", label: "Notifications", action: handleNotifications, hasToggle: true, toggleValue: notificationsEnabled },
     { icon: "palette", label: "Appearance", action: handleAppearance },
-    { icon: "lock-outline", label: "Privacy", action: handlePrivacy },
     { icon: "help-outline", label: "Help & Support", action: handleHelp },
     { icon: "info-outline", label: "About", action: handleAbout },
   ];
@@ -201,207 +203,102 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Profile</Text>
+          <Text style={[styles.title, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>PROFILE</Text>
         </View>
 
         {/* Profile Card */}
-        <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.border }]}>
+        <View style={styles.profileCard}>
+          <View style={[styles.avatarContainer, { borderColor: colors.border }]}>
             {profile?.avatar_url || user?.user_metadata.avatar_url ? (
               <Image
                 source={{ uri: profile?.avatar_url || user?.user_metadata.avatar_url }}
-                style={{ width: 80, height: 80, borderRadius: 40 }}
+                style={styles.avatarImage}
                 contentFit="cover"
               />
             ) : (
               <MaterialIcons name="person" size={40} color={colors.muted} />
             )}
+            <Pressable
+              onPress={handleEditProfile}
+              style={[styles.editBadge, { backgroundColor: colors.primary }]}
+            >
+              <MaterialIcons name="edit" size={14} color="#fff" />
+            </Pressable>
           </View>
+          
           <View style={styles.profileInfo}>
-            <Text style={[styles.userName, { color: colors.foreground }]}>
+            <Text style={[styles.userName, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
               {profile?.full_name || user?.user_metadata.full_name || "Guest User"}
             </Text>
             <Text style={[styles.userEmail, { color: colors.muted }]}>
               {user?.email || "Sign in to sync your data"}
             </Text>
             {isPro && (
-              <View style={[styles.proBadge, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.proBadgeText, { color: colors.background }]}>PRO</Text>
+              <View style={[styles.proBadge, { backgroundColor: "#000" }]}>
+                <Text style={[styles.proBadgeText, { color: "#fff" }]}>PRO MEMBER</Text>
               </View>
             )}
           </View>
-          <Pressable
-            onPress={handleEditProfile}
-            style={[styles.editButton, { borderColor: colors.border }]}
-          >
-            <MaterialIcons name="edit" size={20} color={colors.foreground} />
-          </Pressable>
         </View>
 
         {/* Pro Banner */}
         {!isPro && (
           <Pressable
             onPress={handleUpgradePro}
-            style={[styles.proBanner, { backgroundColor: colors.primary }]}
+            style={[styles.proBanner, { backgroundColor: "#000" }]}
           >
             <View>
-              <Text style={[styles.proBannerTitle, { color: colors.background }]}>
-                Upgrade to Pro
+              <Text style={[styles.proBannerTitle, { color: "#fff", fontFamily: 'PlayfairDisplay_700Bold' }]}>
+                UPGRADE TO PRO
               </Text>
-              <Text style={[styles.proBannerSubtitle, { color: colors.background }]}>
-                Get unlimited items & AI styling
+              <Text style={[styles.proBannerSubtitle, { color: "#ccc" }]}>
+                Unlimited items & AI styling
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" size={24} color={colors.background} />
+            <MaterialIcons name="arrow-forward" size={24} color="#fff" />
           </Pressable>
         )}
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/wishlist" as any);
-            }}
-            style={({ pressed }) => [
-              styles.quickActionCard,
-              { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
-            ]}
-          >
-            <MaterialIcons name="favorite" size={24} color="#E91E63" />
-            <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Wishlist</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/shuffle" as any);
-            }}
-            style={({ pressed }) => [
-              styles.quickActionCard,
-              { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
-            ]}
-          >
-            <MaterialIcons name="shuffle" size={24} color="#9C27B0" />
-            <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Shuffle</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/packing" as any);
-            }}
-            style={({ pressed }) => [
-              styles.quickActionCard,
-              { backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
-            ]}
-          >
-            <MaterialIcons name="luggage" size={24} color="#FF9800" />
-            <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Packing</Text>
-          </Pressable>
-        </View>
-
         {/* Closet Stats */}
         <View style={styles.statsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Closet Overview
-          </Text>
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-              <MaterialIcons name="checkroom" size={24} color={colors.primary} />
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+            <View style={[styles.statCard, { borderColor: colors.border }]}>
+              <Text style={[styles.statValue, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
                 {stats?.totalItems || 0}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.muted }]}>Total Items</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>TOTAL ITEMS</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-              <MaterialIcons name="attach-money" size={24} color={colors.success} />
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+            <View style={[styles.statCard, { borderColor: colors.border }]}>
+              <Text style={[styles.statValue, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
                 ${(stats?.totalValue || 0).toLocaleString()}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.muted }]}>Closet Value</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>VALUE</Text>
             </View>
           </View>
-
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/analytics" as any);
-            }}
-            style={({ pressed }) => [
-              styles.insightsButton,
-              { backgroundColor: colors.primary + "10", borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }
-            ]}
-          >
-            <Text style={[styles.insightsButtonText, { color: colors.primary }]}>View Full Insights</Text>
-            <MaterialIcons name="auto-graph" size={18} color={colors.primary} />
-          </Pressable>
-
-          {/* Category Breakdown */}
-          {stats?.categoryBreakdown && Object.keys(stats.categoryBreakdown).length > 0 && (
-            <View style={[styles.categoryCard, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.categoryTitle, { color: colors.foreground }]}>
-                By Category
-              </Text>
-              {Object.entries(stats.categoryBreakdown).map(([category, count]) => (
-                <View key={category} style={styles.categoryRow}>
-                  <View style={styles.categoryLeft}>
-                    <MaterialIcons
-                      name={CATEGORY_ICONS[category as ClothingCategory] as any}
-                      size={18}
-                      color={colors.muted}
-                    />
-                    <Text style={[styles.categoryName, { color: colors.foreground }]}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.categoryCount, { color: colors.muted }]}>
-                    {count as number}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
         </View>
 
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Settings
-          </Text>
-          <View style={[styles.menuCard, { backgroundColor: colors.surface }]}>
-            {menuItems.map((item, index) => (
-              <Pressable
-                key={item.label}
-                onPress={item.action}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  index < menuItems.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
-                  },
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <View style={styles.menuLeft}>
-                  <MaterialIcons name={item.icon as any} size={22} color={colors.muted} />
-                  <Text style={[styles.menuLabel, { color: colors.foreground }]}>
-                    {item.label}
-                  </Text>
-                </View>
-                {item.hasToggle ? (
-                  <Switch
-                    value={item.toggleValue}
-                    onValueChange={item.action}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={colors.background}
-                  />
-                ) : (
-                  <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
-                )}
-              </Pressable>
-            ))}
-          </View>
+        {/* Menu */}
+        <View style={styles.section}>
+          {menuItems.map((item) => (
+            <Pressable
+              key={item.label}
+              onPress={item.action}
+              style={[styles.menuItem, { borderBottomColor: colors.border }]}
+            >
+              <View style={styles.menuItemLeft}>
+                <Text style={[styles.menuText, { color: colors.foreground, fontFamily: 'PlayfairDisplay_500Medium' }]}>{item.label}</Text>
+              </View>
+              {item.hasToggle ? (
+                <Switch
+                  value={item.toggleValue}
+                  onValueChange={item.action}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                />
+              ) : (
+                <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+              )}
+            </Pressable>
+          ))}
         </View>
 
         {/* Sign Out Button */}
@@ -409,23 +306,13 @@ export default function ProfileScreen() {
           onPress={handleSignOut}
           style={[styles.signOutButton, { borderColor: colors.border }]}
         >
-          <MaterialIcons
-            name={isAuthenticated ? "logout" : "login"}
-            size={20}
-            color={isAuthenticated ? colors.error || "#FF4B4B" : colors.primary}
-          />
           <Text style={[
             styles.signOutText,
-            { color: isAuthenticated ? colors.error || "#FF4B4B" : colors.primary }
+            { color: isAuthenticated ? colors.error || "#FF4B4B" : colors.primary, fontFamily: 'PlayfairDisplay_600SemiBold' }
           ]}>
-            {isAuthenticated ? "Sign Out" : "Sign In"}
+            {isAuthenticated ? "SIGN OUT" : "SIGN IN"}
           </Text>
         </Pressable>
-
-        {/* Watermark */}
-        <View style={styles.watermarkContainer}>
-          <Text style={[styles.watermark, { color: colors.border }]}>FITCHECK</Text>
-        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -435,214 +322,133 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
+    alignItems: 'center',
+    paddingVertical: 20,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "700",
-    letterSpacing: -0.5,
+    fontSize: 20,
+    letterSpacing: 2,
   },
   profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 1,
+    padding: 4,
+    marginBottom: 16,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   profileInfo: {
-    flex: 1,
-    marginLeft: 16,
+    alignItems: 'center',
   },
   userName: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 24,
+    marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    marginTop: 2,
+    marginBottom: 8,
   },
   proBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   proBadgeText: {
     fontSize: 10,
-    fontWeight: "900",
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActions: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    gap: 12,
-  },
-  quickActionCard: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 16,
-    gap: 8,
-  },
-  quickActionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   proBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: 16,
-    padding: 20,
-    borderRadius: 24,
-    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    padding: 24,
+    borderRadius: 0, // Sharp
+    marginBottom: 32,
   },
   proBannerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   proBannerSubtitle: {
-    fontSize: 14,
-    opacity: 0.9,
-    marginTop: 2,
+    fontSize: 12,
   },
   statsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
   statsGrid: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 12,
+    flexDirection: 'row',
+    gap: 16,
   },
   statCard: {
     flex: 1,
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    gap: 6,
+    alignItems: 'center',
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 0, // Sharp
   },
   statValue: {
     fontSize: 24,
-    fontWeight: "700",
+    marginBottom: 8,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
+    letterSpacing: 1,
   },
-  categoryCard: {
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 16,
-  },
-  categoryTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  categoryLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  categoryName: {
-    fontSize: 14,
-  },
-  categoryCount: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  menuSection: {
-    marginBottom: 20,
-  },
-  menuCard: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: "hidden",
+  section: {
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
   menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  menuLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  menuLabel: {
-    fontSize: 15,
+  menuText: {
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
   signOutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
+    marginHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 30,
     marginBottom: 20,
   },
   signOutText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  watermarkContainer: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  watermark: {
-    fontSize: 48,
-    fontWeight: "900",
-    letterSpacing: 8,
-    opacity: 0.1,
-  },
-  insightsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    marginTop: 8,
-  },
-  insightsButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 12,
+    letterSpacing: 1,
   },
 });

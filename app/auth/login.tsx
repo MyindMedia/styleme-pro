@@ -88,80 +88,73 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: "transparent" }]}>
-              <ExpoImage
-                source={require("@/assets/images/icon.png")}
-                style={{ width: 80, height: 80, borderRadius: 20 }}
-                contentFit="cover"
-              />
+            <View style={styles.topShapes}>
+               {/* Abstract shapes simulation */}
+               <View style={[styles.circleShape, { backgroundColor: colors.border, opacity: 0.3 }]} />
             </View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Welcome Back</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>
-              Sign in to access your wardrobe
-            </Text>
+            <Text style={[styles.title, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>MEET YOUR ACCOUNT</Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
-              <View
+              <TextInput
                 style={[
-                  styles.inputWrapper,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  styles.input,
+                  { 
+                    backgroundColor: colors.background, 
+                    borderColor: colors.border,
+                    color: colors.foreground 
+                  }
                 ]}
-              >
-                <MaterialIcons name="email" size={20} color={colors.muted} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="you@example.com"
-                  placeholderTextColor={colors.muted}
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  returnKeyType="next"
-                />
-              </View>
+                placeholder="Type something here..."
+                placeholderTextColor={colors.muted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType="next"
+              />
             </View>
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
-              <View
+              <TextInput
                 style={[
-                  styles.inputWrapper,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  styles.input,
+                  { 
+                    backgroundColor: colors.background, 
+                    borderColor: colors.border,
+                    color: colors.foreground 
+                  }
                 ]}
+                placeholder="Type something here..."
+                placeholderTextColor={colors.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+              />
+              <Pressable 
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
               >
-                <MaterialIcons name="lock" size={20} color={colors.muted} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Enter your password"
-                  placeholderTextColor={colors.muted}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
+                <MaterialIcons
+                  name={showPassword ? "visibility-off" : "visibility"}
+                  size={20}
+                  color={colors.muted}
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)}>
-                  <MaterialIcons
-                    name={showPassword ? "visibility-off" : "visibility"}
-                    size={20}
-                    color={colors.muted}
-                  />
-                </Pressable>
-              </View>
+              </Pressable>
             </View>
 
             {/* Forgot Password */}
             <Link href="/auth/forgot-password" asChild>
               <Pressable style={styles.forgotPassword}>
-                <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                  Forgot password?
+                <Text style={[styles.forgotPasswordText, { color: colors.muted, fontFamily: 'PlayfairDisplay_400Regular' }]}>
+                  Forgot Password?
                 </Text>
               </Pressable>
             </Link>
@@ -176,51 +169,47 @@ export default function LoginScreen() {
               ]}
             >
               {isLoading ? (
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={[styles.loginButtonText, { color: colors.background }]}>
-                  Sign In
+                <Text style={[styles.loginButtonText, { color: "#fff", fontFamily: 'PlayfairDisplay_600SemiBold' }]}>
+                  Login
                 </Text>
               )}
             </Pressable>
 
             {/* Divider */}
             <View style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.dividerText, { color: colors.muted }]}>or continue with</Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.muted, fontFamily: 'PlayfairDisplay_400Regular' }]}>Or with</Text>
             </View>
 
             {/* OAuth Buttons */}
             <View style={styles.oauthContainer}>
-              <Pressable
-                onPress={() => handleOAuthLogin("google")}
-                style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <Ionicons name="logo-google" size={20} color={colors.foreground} />
-                <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>Google</Text>
-              </Pressable>
-
               {Platform.OS === "ios" && (
                 <Pressable
                   onPress={() => handleOAuthLogin("apple")}
-                  style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  style={[styles.oauthButton, { borderColor: colors.border }]}
                 >
-                  <MaterialIcons name="apple" size={20} color={colors.foreground} />
-                  <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>Apple</Text>
+                  <Text style={[styles.oauthButtonText, { color: colors.muted, fontFamily: 'PlayfairDisplay_500Medium' }]}>Apple</Text>
                 </Pressable>
               )}
+
+              <Pressable
+                onPress={() => handleOAuthLogin("google")}
+                style={[styles.oauthButton, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.oauthButtonText, { color: colors.muted, fontFamily: 'PlayfairDisplay_500Medium' }]}>Google</Text>
+              </Pressable>
             </View>
           </View>
 
           {/* Sign Up Link */}
           <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: colors.muted }]}>
-              {"Don't have an account? "}
+            <Text style={[styles.footerText, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
+              Don't have account?
             </Text>
             <Link href="/auth/signup" asChild>
               <Pressable>
-                <Text style={[styles.footerLink, { color: colors.primary }]}>Sign Up</Text>
+                <Text style={[styles.footerLink, { color: colors.foreground, fontFamily: 'PlayfairDisplay_400Regular' }]}> Sign Up</Text>
               </Pressable>
             </Link>
           </View>
@@ -247,107 +236,100 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 40,
+    marginTop: 40,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
+  topShapes: {
+    position: 'absolute',
+    top: -120,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  circleShape: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 24,
     marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
     textAlign: "center",
+    letterSpacing: 1,
   },
   form: {
     marginBottom: 24,
   },
   inputContainer: {
     marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    gap: 12,
+    position: 'relative',
   },
   input: {
-    flex: 1,
-    fontSize: 16,
+    height: 50,
+    borderRadius: 25, // Rounded full
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    fontSize: 14,
+    fontFamily: 'PlayfairDisplay_400Regular',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    top: 15,
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginBottom: 24,
+    marginBottom: 30,
   },
   forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 12,
   },
   loginButton: {
-    height: 52,
-    borderRadius: 12,
+    height: 50,
+    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 20,
   },
   loginButtonText: {
     fontSize: 16,
-    fontWeight: "600",
+    letterSpacing: 0.5,
   },
   divider: {
-    flexDirection: "row",
     alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
+    marginVertical: 20,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 13,
+    fontSize: 14,
   },
   oauthContainer: {
     flexDirection: "row",
-    gap: 12,
+    gap: 16,
+    justifyContent: 'center',
   },
   oauthButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
+    width: 120,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
-    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
   },
   oauthButtonText: {
     fontSize: 14,
-    fontWeight: "500",
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 20,
+    gap: 4,
   },
   footerText: {
     fontSize: 14,
   },
   footerLink: {
     fontSize: 14,
-    fontWeight: "600",
+    textDecorationLine: 'underline',
   },
 });

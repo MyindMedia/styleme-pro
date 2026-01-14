@@ -103,6 +103,7 @@ const config: ExpoConfig = {
         },
       },
     ],
+    "expo-font",
   ],
   experiments: {
     typedRoutes: true,

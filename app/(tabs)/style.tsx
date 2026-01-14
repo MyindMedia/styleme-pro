@@ -26,6 +26,7 @@ import {
   generateId,
 } from "@/lib/storage";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MOODS = [
   { key: "old-money", label: "Old Money", icon: "workspace-premium", color: "#D4AF37" },
@@ -121,6 +122,7 @@ interface GeneratedOutfit {
 export default function StyleMeScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { isPro, showPaywall } = useAuth();
   const [selectedMood, setSelectedMood] = useState("old-money");
   const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
   const [generatedOutfits, setGeneratedOutfits] = useState<GeneratedOutfit[]>([]);
@@ -146,6 +148,11 @@ export default function StyleMeScreen() {
   };
 
   const generateOutfits = useCallback(async () => {
+    if (!isPro && !isDemoMode) {
+      showPaywall();
+      return;
+    }
+
     const items = getItemsForGeneration();
 
     if (items.length < 2) {
@@ -253,6 +260,11 @@ export default function StyleMeScreen() {
   };
 
   const generateWeatherLook = async () => {
+    if (!isPro && !isDemoMode) {
+      showPaywall();
+      return;
+    }
+
     const items = isDemoMode ? DEMO_ITEMS : closetItems;
     if (items.length < 1) {
       Alert.alert("Need Items", "Add some items to your closet to get weather-based recommendations!");
@@ -460,374 +472,340 @@ export default function StyleMeScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Style Me</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>
-              AI-powered outfit suggestions
-            </Text>
-          </View>
-          {isDemoMode && (
-            <Pressable
-              onPress={handleExitDemo}
-              style={({ pressed }) => [
-                styles.exitDemoButton,
-                { backgroundColor: colors.warning, opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Text style={styles.exitDemoText}>Exit Demo</Text>
-            </Pressable>
-          )}
+        <Text style={[styles.title, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>STYLE ME</Text>
+        <View style={styles.headerActions}>
+           <MaterialIcons name="notifications-none" size={24} color={colors.foreground} />
+           <MaterialIcons name="favorite-border" size={24} color={colors.foreground} />
         </View>
+      </View>
+
+      <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+        <MaterialIcons name="search" size={20} color={colors.muted} />
+        <Text style={[styles.searchText, { color: colors.muted }]}>Search styles...</Text>
+        <MaterialIcons name="tune" size={20} color={colors.muted} />
       </View>
 
       {isDemoMode && (
-        <View style={[styles.demoBanner, { backgroundColor: colors.warning + "20" }]}>
-          <MaterialIcons name="info" size={18} color={colors.warning} />
-          <Text style={[styles.demoBannerText, { color: colors.warning }]}>
-            Demo Mode: Using sample items. Add your own clothes to save outfits!
+        <View style={[styles.demoBanner, { backgroundColor: "#F0F0F1" }]}>
+          <Text style={[styles.demoBannerText, { color: colors.foreground, fontFamily: 'PlayfairDisplay_500Medium' }]}>
+            DEMO MODE ACTIVE
           </Text>
+          <Pressable onPress={handleExitDemo}>
+             <Text style={{ textDecorationLine: 'underline', fontSize: 12 }}>EXIT</Text>
+          </Pressable>
         </View>
       )}
 
-      <View style={styles.moodSection}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Choose Your Mood
-        </Text>
-        <FlatList
-          data={MOODS}
-          renderItem={renderMoodPill}
-          keyExtractor={(item) => item.key}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.moodList}
-        />
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Moods / Categories */}
+        <View style={styles.moodSection}>
+          <FlatList
+            data={MOODS}
+            renderItem={renderMoodPill}
+            keyExtractor={(item) => item.key}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moodList}
+          />
+        </View>
 
-      <Pressable
-        onPress={generateOutfits}
-        disabled={isGenerating || !canGenerate}
-        style={({ pressed }) => [
-          styles.generateButton,
-          {
-            backgroundColor: colors.primary,
-            opacity: isGenerating || !canGenerate ? 0.5 : pressed ? 0.9 : 1,
-          },
-        ]}
-      >
-        {isGenerating ? (
-          <ActivityIndicator color={colors.background} />
-        ) : (
-          <>
-            <MaterialIcons name="auto-awesome" size={20} color={colors.background} />
-            <Text style={[styles.generateButtonText, { color: colors.background }]}>
-              Generate AI Looks {itemCount > 0 && `(${itemCount} items)`}
+        {/* Generate Button (styled as a featured action) */}
+        <Pressable
+          onPress={generateOutfits}
+          disabled={isGenerating || !canGenerate}
+          style={({ pressed }) => [
+            styles.generateButton,
+            {
+              backgroundColor: colors.primary,
+              opacity: isGenerating || !canGenerate ? 0.8 : pressed ? 0.9 : 1,
+            },
+          ]}
+        >
+          {isGenerating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={[styles.generateButtonText, { color: "#fff", fontFamily: 'PlayfairDisplay_600SemiBold' }]}>
+              GENERATE NEW LOOKS
             </Text>
-          </>
-        )}
-      </Pressable>
+          )}
+        </Pressable>
 
-      <Pressable
-        onPress={generateWeatherLook}
-        disabled={isWeatherLoading || !canGenerate}
-        style={({ pressed }) => [
-          styles.weatherButton,
-          {
-            backgroundColor: colors.surface,
-            opacity: isWeatherLoading || !canGenerate ? 0.5 : pressed ? 0.9 : 1,
-            borderWidth: 1,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        {isWeatherLoading ? (
-          <ActivityIndicator color={colors.primary} />
+        {/* Weather Look */}
+        <Pressable
+          onPress={generateWeatherLook}
+          disabled={isWeatherLoading || !canGenerate}
+          style={[styles.collectionCard, { backgroundColor: "#DADFFE" }]} // Subtle Blue from design
+        >
+           <View style={styles.collectionContent}>
+              <Text style={[styles.collectionTitle, { fontFamily: 'PlayfairDisplay_700Bold' }]}>WEATHER EDIT</Text>
+              <Text style={[styles.collectionSubtitle, { fontFamily: 'PlayfairDisplay_400Regular' }]}>
+                {weatherRecommendation?.weather 
+                  ? `${weatherRecommendation.weather.temperature}°F & ${weatherRecommendation.weather.condition}`
+                  : "Curated for your forecast"}
+              </Text>
+              {isWeatherLoading && <ActivityIndicator color="#000" style={{ marginTop: 8 }} />}
+           </View>
+           <View style={styles.collectionImagePlaceholder}>
+              <MaterialIcons name="wb-sunny" size={40} color="#fff" />
+           </View>
+        </Pressable>
+
+        {/* Generated Outfits */}
+        {hasGenerated && generatedOutfits.length > 0 ? (
+          <View style={styles.outfitsContainer}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: 'PlayfairDisplay_700Bold' }]}>
+              CURATED FOR YOU
+            </Text>
+            {generatedOutfits.map((item, index) => (
+               <View key={item.id} style={{ marginBottom: 24 }}>
+                 {renderOutfitCard({ item, index })}
+               </View>
+            ))}
+          </View>
         ) : (
-          <>
-            <View style={[styles.weatherIcon, { backgroundColor: colors.primary + "10" }]}>
-              <MaterialIcons name="wb-sunny" size={24} color={colors.primary} />
-            </View>
-            <View style={styles.weatherInfo}>
-              <Text style={[styles.weatherTitle, { color: colors.foreground }]}>
-                Weather Look
-              </Text>
-              <Text style={[styles.weatherSubtitle, { color: colors.muted }]}>
-                Outfit based on your local weather
-              </Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
-          </>
+          <View style={styles.emptyContainer}>
+             {renderEmptyState()}
+          </View>
         )}
-      </Pressable>
-
-      {weatherRecommendation && weatherRecommendation.weather && (
-        <View style={styles.weatherSummary}>
-          <Text style={[styles.weatherSummaryText, { color: colors.foreground }]}>
-            <Text style={{ fontWeight: "700" }}>
-              {weatherRecommendation.weather.temperature}°F & {weatherRecommendation.weather.condition}.
-            </Text>{" "}
-            {weatherRecommendation.recommendation.summary}
-          </Text>
-        </View>
-      )}
-
-      {hasGenerated && generatedOutfits.length > 0 ? (
-        <FlatList
-          data={generatedOutfits}
-          renderItem={renderOutfitCard}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.outfitList}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <ScrollView contentContainerStyle={styles.emptyContainer} showsVerticalScrollIndicator={false}>
-          {renderEmptyState()}
-        </ScrollView>
-      )}
+      </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    marginTop: 2,
-  },
-  exitDemoButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  exitDemoText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#000",
-  },
-  demoBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  demoBannerText: {
-    flex: 1,
-    fontSize: 13,
-  },
-  weatherButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 16,
-    borderRadius: 16,
-    gap: 12,
-  },
-  weatherIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  weatherInfo: {
-    flex: 1,
-  },
-  weatherTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  weatherSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  moodSection: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  moodList: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  moodPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    gap: 6,
-  },
-  moodText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  generateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    marginBottom: 16,
-  },
-  generateButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  weatherSummary: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 16,
   },
-  weatherSummaryText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontStyle: "italic",
+  title: {
+    fontSize: 20,
+    letterSpacing: 2,
   },
-  outfitList: {
-    padding: 16,
-    paddingBottom: 100,
+  headerActions: {
+    flexDirection: 'row',
     gap: 16,
   },
+  searchBar: {
+    marginHorizontal: 20,
+    height: 48,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  searchText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  moodSection: {
+    marginBottom: 24,
+  },
+  moodList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  moodPill: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 0, // Sharp or rounded? Design shows pills in some places, sharp in others. Let's go sharp for "Tabs" look.
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  moodText: {
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  generateButton: {
+    marginHorizontal: 20,
+    height: 56,
+    borderRadius: 0, // Sharp
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  generateButtonText: {
+    fontSize: 14,
+    letterSpacing: 2,
+  },
+  collectionCard: {
+    marginHorizontal: 20,
+    height: 160,
+    borderRadius: 0,
+    padding: 24,
+    marginBottom: 32,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  collectionContent: {
+    flex: 1,
+    zIndex: 1,
+  },
+  collectionTitle: {
+    fontSize: 20,
+    marginBottom: 8,
+    color: '#000',
+  },
+  collectionSubtitle: {
+    fontSize: 14,
+    color: '#555',
+  },
+  collectionImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outfitsContainer: {
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    marginBottom: 16,
+    letterSpacing: 1,
+  },
   outfitCard: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 0,
+    backgroundColor: '#fff', // Or colors.surface
+    padding: 0,
   },
   outfitHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   outfitHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   outfitBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#000',
   },
   outfitBadgeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#fff",
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
   },
   demoBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 0,
+    backgroundColor: '#F0F0F1',
   },
   demoBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#000",
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#000',
   },
   saveButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
   saveButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    letterSpacing: 1,
   },
   outfitGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
     gap: 12,
   },
   outfitItemContainer: {
-    width: (width - 80) / 3,
-    alignItems: "center",
+    flex: 1,
+    aspectRatio: 0.75,
   },
   outfitItemImage: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
+    width: '100%',
+    height: '100%',
+    borderRadius: 0,
   },
   outfitItemLabel: {
+    marginTop: 8,
     fontSize: 11,
-    marginTop: 4,
-    textAlign: "center",
+    textAlign: 'center',
+    fontFamily: 'PlayfairDisplay_400Regular',
   },
   emptyContainer: {
-    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 40,
   },
   emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 40,
-    paddingHorizontal: 20,
-    gap: 12,
+    alignItems: 'center',
+    gap: 16,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    textAlign: "center",
+    fontSize: 24,
+    fontFamily: 'PlayfairDisplay_700Bold',
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 15,
-    textAlign: "center",
-    paddingHorizontal: 20,
+    fontSize: 14,
+    textAlign: 'center',
     lineHeight: 22,
-  },
-  emptyActions: {
-    marginTop: 20,
-    gap: 12,
-    width: "100%",
     maxWidth: 280,
   },
+  emptyActions: {
+    width: '100%',
+    gap: 16,
+    marginTop: 24,
+  },
   primaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   primaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    letterSpacing: 1,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
   },
   secondaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    letterSpacing: 1,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
+  },
+  demoBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  demoBannerText: {
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  exitDemoButton: {
+    // unused
+  },
+  exitDemoText: {
+    // unused
   },
 });

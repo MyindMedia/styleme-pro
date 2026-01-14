@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "tunnel": "npx expo start --tunnel",
     "qr": "node scripts/generate_qr.mjs",
     "postinstall": "mkdir -p node_modules/react-native-css-interop/.cache && touch node_modules/react-native-css-interop/.cache/web.css"
   },

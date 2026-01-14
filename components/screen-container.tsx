@@ -1,7 +1,8 @@
-import { View, type ViewProps } from "react-native";
+import { View, type ViewProps, Text, StyleSheet } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
+import { useColors } from "@/hooks/use-colors";
 
 export interface ScreenContainerProps extends ViewProps {
   /**
@@ -21,6 +22,10 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /**
+   * Whether to show the background brand watermark. Defaults to false.
+   */
+  showWatermark?: boolean;
 }
 
 /**
@@ -45,8 +50,11 @@ export function ScreenContainer({
   containerClassName,
   safeAreaClassName,
   style,
+  showWatermark = false,
   ...props
 }: ScreenContainerProps) {
+  const colors = useColors();
+
   return (
     <View
       className={cn(
@@ -63,6 +71,31 @@ export function ScreenContainer({
       >
         <View className={cn("flex-1", className)}>{children}</View>
       </SafeAreaView>
+      
+      {showWatermark && (
+        <View style={styles.watermark} pointerEvents="none">
+          <Text style={[styles.watermarkText, { color: colors.border }]}>STYLE</Text>
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  watermark: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: -1,
+    opacity: 0.5,
+  },
+  watermarkText: {
+    fontSize: 100,
+    fontWeight: "900",
+    letterSpacing: 10,
+    opacity: 0.1,
+  },
+});

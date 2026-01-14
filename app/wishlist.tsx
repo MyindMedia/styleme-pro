@@ -34,13 +34,9 @@ import {
   getBlendScoreLabel,
   generateId,
   CLOTHING_TYPES,
-  OCCASIONS,
-  SEASONS,
-  POPULAR_BRANDS,
-  ClothingItem,
 } from "@/lib/storage";
 
-const { width } = Dimensions.get("window");
+const { width: _width } = Dimensions.get("window");
 
 const CATEGORIES: { key: ClothingCategory; label: string; icon: string }[] = [
   { key: "tops", label: "Tops", icon: "checkroom" },
@@ -361,7 +357,7 @@ export default function WishlistScreen() {
             Your Wishlist is Empty
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-            Add items you're considering buying to see how they'll blend with your current wardrobe
+            {"Add items you're considering buying to see how they'll blend with your current wardrobe"}
           </Text>
           <Pressable
             onPress={() => setShowAddModal(true)}

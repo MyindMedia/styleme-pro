@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Text,
   View,
@@ -10,6 +10,8 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  Linking,
+  Switch,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -21,9 +23,11 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ClothingCategory,
   ClothingItem,
+  GarmentMeasurements,
   Occasion,
   Season,
   saveClothingItem,
@@ -66,6 +70,7 @@ const COLORS = [
 export default function AddItemScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { isPro } = useAuth();
 
   // Recognition flow state
   const [step, setStep] = useState<RecognitionStep>("input");
@@ -89,10 +94,21 @@ export default function AddItemScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Scraped product details
+  const [fabric, setFabric] = useState("");
+  const [measurements, setMeasurements] = useState<GarmentMeasurements | null>(null);
+  const [scrapedProductUrl, setScrapedProductUrl] = useState<string | null>(null);
+  const [fit, setFit] = useState<"slim" | "regular" | "relaxed" | "oversized" | null>(null);
+  const [size, setSize] = useState("");
+  const [removeBackground, setRemoveBackground] = useState(true);
+  const [processingBackground, setProcessingBackground] = useState(false);
+  const [originalImageUri, setOriginalImageUri] = useState<string | null>(null);
+
   // tRPC mutations
   const recognizeFromImage = trpc.clothing.recognizeFromImage.useMutation();
   const recognizeFromUrl = trpc.clothing.recognizeFromUrl.useMutation();
   const reverseImageSearch = trpc.clothing.reverseImageSearch.useMutation();
+  const removeBackgroundMutation = trpc.imageProcessing.removeBackground.useMutation();
 
   const filteredBrands = POPULAR_BRANDS.filter((b) =>
     b.toLowerCase().includes(brandSearch.toLowerCase())
@@ -128,16 +144,52 @@ export default function AddItemScreen() {
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       setImageUri(uri);
+      setOriginalImageUri(uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      // Start AI recognition
+      // Start AI recognition and background removal
       analyzeImage(uri);
+    }
+  };
+
+  const processBackgroundRemoval = async (uri: string) => {
+    if (!removeBackground) return;
+
+    try {
+      setProcessingBackground(true);
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
+      });
+
+      const result = await removeBackgroundMutation.mutateAsync({
+        imageBase64: base64,
+        mimeType: "image/jpeg",
+        type: "product",
+      });
+
+      if (result.success && result.processedImageBase64) {
+        const tempPath = `${FileSystem.cacheDirectory}processed_${Date.now()}.png`;
+        await FileSystem.writeAsStringAsync(tempPath, result.processedImageBase64, {
+          encoding: "base64",
+        });
+        setImageUri(tempPath);
+      }
+    } catch (error) {
+      console.error("Background removal failed:", error);
+      // Fallback to original image silently
+    } finally {
+      setProcessingBackground(false);
     }
   };
 
   const analyzeImage = async (uri: string) => {
     setStep("analyzing");
     setRecognitionError(null);
+
+    // Start background removal in parallel if enabled
+    if (removeBackground) {
+      processBackgroundRemoval(uri);
+    }
 
     try {
       // Convert image to base64
@@ -330,6 +382,34 @@ export default function AddItemScreen() {
         setSelectedSeasons(validSeasons);
       }
     }
+
+    // Set material/fabric
+    if (item.material) {
+      setFabric(item.material);
+    }
+
+    // Set measurements if available
+    if (item.measurements) {
+      setMeasurements(item.measurements);
+    }
+
+    // Set fit type
+    if (item.fit) {
+      const validFits = ["slim", "regular", "relaxed", "oversized"];
+      if (validFits.includes(item.fit.toLowerCase())) {
+        setFit(item.fit.toLowerCase() as "slim" | "regular" | "relaxed" | "oversized");
+      }
+    }
+
+    // Set size label
+    if (item.sizeLabel) {
+      setSize(item.sizeLabel);
+    }
+
+    // Set product URL
+    if (item.productUrl) {
+      setScrapedProductUrl(item.productUrl);
+    }
   };
 
   const toggleOccasion = (occasion: Occasion) => {
@@ -380,6 +460,15 @@ export default function AddItemScreen() {
       seasons: selectedSeasons,
       createdAt: new Date().toISOString(),
       wearCount: 0,
+      // Scraped/enhanced fields
+      fabric: fabric.trim() || undefined,
+      size: size.trim() || undefined,
+      productUrl: scrapedProductUrl || undefined,
+      measurements: measurements ? {
+        ...measurements,
+        fit: fit || undefined,
+        sizeLabel: size.trim() || undefined,
+      } : undefined,
     };
 
     await saveClothingItem(newItem);
@@ -526,7 +615,7 @@ export default function AddItemScreen() {
         </Text>
         {searchQuery && (
           <Text style={[styles.searchQueryText, { color: colors.muted }]}>
-            Search: "{searchQuery}"
+            {`Search: "${searchQuery}"`}
           </Text>
         )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.searchResultsScroll}>
@@ -538,17 +627,22 @@ export default function AddItemScreen() {
                   if (result.url) {
                     Alert.alert(
                       result.name || "Product",
-                      `${result.store || "Store"}\n${result.price || ""}\n\nOpen this product page?`,
+                      `${result.store || "Store"}\n${result.price || ""}\n\nWhat would you like to do?`,
                       [
                         { text: "Cancel", style: "cancel" },
                         {
+                          text: "Open Link",
+                          onPress: () => Linking.openURL(result.url)
+                        },
+                        // Only show "Use Price" if it looks like a real price (contains numbers)
+                        ...(result.price && /\d/.test(result.price) ? [{
                           text: "Use Price",
                           onPress: () => {
                             const priceValue = result.price?.replace(/[^0-9.]/g, "");
                             if (priceValue) setPrice(priceValue);
                             if (result.brand) setBrand(result.brand);
                           }
-                        },
+                        }] : [])
                       ]
                     );
                   }
@@ -684,10 +778,18 @@ export default function AddItemScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Photo</Text>
           <View style={styles.imageContainer}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="cover" />
+            <View style={styles.imageWrapper}>
+              <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="contain" />
+              {processingBackground && (
+                <View style={styles.processingOverlay}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              )}
+            </View>
             <Pressable
               onPress={() => {
                 setImageUri(null);
+                setOriginalImageUri(null);
                 setStep("input");
               }}
               style={[styles.removeImageButton, { backgroundColor: colors.error }]}
@@ -695,6 +797,38 @@ export default function AddItemScreen() {
               <MaterialIcons name="close" size={16} color="#fff" />
             </Pressable>
           </View>
+          
+          {originalImageUri && (
+            <View style={styles.bgRemovalToggle}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={[styles.bgRemovalText, { color: colors.foreground }]}>Remove Background</Text>
+                    {!isPro && (
+                        <View style={{ backgroundColor: "#FFD700", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "black" }}>PRO</Text>
+                        </View>
+                    )}
+                </View>
+                {!isPro && <Text style={{ fontSize: 11, color: colors.muted }}>Upgrade to enable AI removal</Text>}
+              </View>
+              <Switch
+                value={removeBackground}
+                onValueChange={(val) => {
+                  if (val && !isPro) {
+                    router.push("/paywall" as any);
+                    return;
+                  }
+                  setRemoveBackground(val);
+                  if (val) {
+                    processBackgroundRemoval(originalImageUri);
+                  } else {
+                    setImageUri(originalImageUri);
+                  }
+                }}
+                trackColor={{ false: colors.border, true: colors.primary }}
+              />
+            </View>
+          )}
         </View>
       )}
 
@@ -915,7 +1049,7 @@ export default function AddItemScreen() {
   );
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]}>
+    <ScreenContainer edges={["top", "left", "right", "bottom"]} showWatermark={true}>
       <View style={styles.header}>
         <Pressable
           onPress={() => {
@@ -1003,7 +1137,7 @@ export default function AddItemScreen() {
             >
               <MaterialIcons name="add" size={18} color={colors.background} />
               <Text style={[styles.customBrandText, { color: colors.background }]}>
-                Use "{brandSearch}"
+                {`Use "${brandSearch}"`}
               </Text>
             </Pressable>
           )}

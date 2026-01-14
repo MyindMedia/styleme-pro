@@ -6,7 +6,6 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Dimensions,
   useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
@@ -42,7 +41,7 @@ export default function DashboardScreen() {
   const { user, profile, isLoading: authLoading } = useAuth();
 
   const [items, setItems] = useState<ClothingItem[]>([]);
-  const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [_outfits, setOutfits] = useState<Outfit[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -74,11 +73,28 @@ export default function DashboardScreen() {
     loadData();
   }, [loadData]);
 
+  // Initial sync on mount
+  useEffect(() => {
+    if (user && user.id && profile?.id) {
+        // Run in background so it doesn't block UI, then reload data
+        performFullSync({ id: Number(profile.id), openId: user.id })
+          .then(() => loadData())
+          .catch(err => console.error("Initial sync failed:", err));
+    }
+  }, [user, profile, loadData]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    if (user && user.id && profile?.id) {
+       try {
+         await performFullSync({ id: Number(profile.id), openId: user.id });
+       } catch (e) {
+         console.error("Refresh sync failed:", e);
+       }
+    }
     await loadData();
     setRefreshing(false);
-  }, [loadData]);
+  }, [loadData, user, profile]);
 
   // Calculate stats
   const totalItems = items.length;
@@ -289,7 +305,7 @@ export default function DashboardScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
               Category Breakdown
             </Text>
-            <Pressable onPress={() => router.push("/(tabs)/index")}>
+            <Pressable onPress={() => router.push("/")}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>View All</Text>
             </Pressable>
           </View>
@@ -303,7 +319,7 @@ export default function DashboardScreen() {
                 key={cat.category}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push("/(tabs)/index");
+                  router.push("/");
                 }}
                 style={[styles.categoryCard, { backgroundColor: colors.surface }]}
               >
@@ -329,7 +345,7 @@ export default function DashboardScreen() {
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
                 Recently Added
               </Text>
-              <Pressable onPress={() => router.push("/(tabs)/index")}>
+              <Pressable onPress={() => router.push("/")}>
                 <Text style={[styles.seeAll, { color: colors.primary }]}>View All</Text>
               </Pressable>
             </View>
@@ -425,7 +441,7 @@ export default function DashboardScreen() {
                   Closet Insight
                 </Text>
                 <Text style={[styles.insightText, { color: colors.muted }]}>
-                  You have {unwornItems.length} items you haven't worn yet. Try mixing them into your outfits!
+                  {"You have "}{unwornItems.length}{" items you haven't worn yet. Try mixing them into your outfits!"}
                 </Text>
               </View>
             </View>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Text,
   View,
@@ -8,7 +8,6 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -21,7 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { getClothingItems, ClothingItem } from "@/lib/storage";
 import { trpc } from "@/lib/trpc";
 
-const { width } = Dimensions.get("window");
+const { width: _width } = Dimensions.get("window");
 
 const WEATHER_ICONS: Record<string, string> = {
   sunny: "wb-sunny",
@@ -182,7 +181,7 @@ export default function WeatherOutfitScreen() {
     return (
       <View style={[styles.recommendationCard, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Today's Style Advice
+          {"Today's Style Advice"}
         </Text>
         <Text style={[styles.recommendationSummary, { color: colors.foreground }]}>
           {recommendation.summary}
@@ -225,7 +224,7 @@ export default function WeatherOutfitScreen() {
 
         {recommendation.accessories?.length > 0 && (
           <View style={styles.tagSection}>
-            <Text style={[styles.tagLabel, { color: colors.muted }]}>Don't Forget:</Text>
+            <Text style={[styles.tagLabel, { color: colors.muted }]}>{"Don't Forget:"}</Text>
             <View style={styles.tagRow}>
               {recommendation.accessories.map((acc: string, idx: number) => (
                 <View key={idx} style={[styles.tag, { backgroundColor: colors.primary + "20" }]}>

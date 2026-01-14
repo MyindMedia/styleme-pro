@@ -515,6 +515,33 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
   },
+  weatherButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+  },
+  weatherIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  weatherInfo: {
+    flex: 1,
+  },
+  weatherTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  weatherSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
   moodSection: {
     marginBottom: 16,
   },

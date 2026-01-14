@@ -196,7 +196,44 @@ const urlScrapingSchema = {
           type: { type: "string" },
           imageUrl: { type: "string" },
           productUrl: { type: "string" },
-          description: { type: "string" }
+          description: { type: "string" },
+          material: { type: "string", description: "Fabric/material composition" },
+          careInstructions: { type: "string", description: "Washing/care instructions" },
+          fit: { type: "string", enum: ["slim", "regular", "relaxed", "oversized"], description: "Fit type" },
+          sizeLabel: { type: "string", description: "Available sizes (e.g., XS, S, M, L, XL)" },
+          measurements: {
+            type: "object",
+            properties: {
+              chest: { type: "number", description: "Chest measurement in inches" },
+              waist: { type: "number", description: "Waist measurement in inches" },
+              length: { type: "number", description: "Length measurement in inches" },
+              shoulderWidth: { type: "number", description: "Shoulder width in inches" },
+              sleeveLength: { type: "number", description: "Sleeve length in inches" },
+              inseam: { type: "number", description: "Inseam measurement in inches" },
+              rise: { type: "number", description: "Rise measurement in inches" },
+              hipWidth: { type: "number", description: "Hip width in inches" },
+              thigh: { type: "number", description: "Thigh measurement in inches" },
+              legOpening: { type: "number", description: "Leg opening in inches" },
+              usSize: { type: "string", description: "US shoe size" },
+              euSize: { type: "number", description: "EU shoe size" }
+            },
+            description: "Product measurements if available"
+          },
+          sizeChart: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                size: { type: "string" },
+                chest: { type: "number" },
+                waist: { type: "number" },
+                length: { type: "number" },
+                inseam: { type: "number" }
+              },
+              required: ["size"]
+            },
+            description: "Size chart with measurements for each size"
+          }
         },
         required: ["name"]
       },
@@ -433,61 +470,54 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
           const type = identifiedItem.type || identifiedItem.productType || "";
           const color = identifiedItem.color || "";
           const searchQuery = searchTerms || `${brand} ${color} ${type}`.trim();
+          const encodedQuery = encodeURIComponent(searchQuery);
 
-          // Search multiple sources for product matches
-          const searchPromises = [
-            // Google Shopping search simulation via LLM
-            invokeLLM({
-              messages: [
-                {
-                  role: "system",
-                  content: `You are a shopping assistant that finds product matches. Given a search query and item description, generate realistic product listings that would match this item.
-
-For each match, provide:
-- Product name
-- Brand
-- Price (realistic for the item type)
-- Store name (use real retailers like Nordstrom, ASOS, Zara, H&M, Amazon, etc.)
-- A plausible product URL format
-- Similarity score (how closely it matches the search)
-
-Generate 5-8 realistic product matches from different retailers.`
-                },
-                {
-                  role: "user",
-                  content: `Find products matching: "${searchQuery}"
-                  
-Item details:
-- Type: ${type}
-- Brand: ${brand}
-- Color: ${color}
-- Description: ${input.itemDescription || "Not provided"}
-
-Return realistic product matches from various online retailers.`
-                }
-              ],
-              outputSchema: reverseImageSearchSchema
-            })
+          // Generate real search links instead of hallucinated products
+          const realSearchMatches = [
+            {
+              name: `Find "${searchQuery}" on Google Shopping`,
+              brand: brand || "Google Shopping",
+              price: "View Prices",
+              store: "Google Shopping",
+              url: `https://www.google.com/search?tbm=shop&q=${encodedQuery}`,
+              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png",
+              similarity: 100
+            },
+            {
+              name: `Find "${searchQuery}" on Amazon`,
+              brand: brand || "Amazon",
+              price: "View Prices",
+              store: "Amazon",
+              url: `https://www.amazon.com/s?k=${encodedQuery}`,
+              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/603px-Amazon_logo.svg.png",
+              similarity: 95
+            },
+            {
+              name: `Find "${searchQuery}" on eBay`,
+              brand: brand || "eBay",
+              price: "View Prices",
+              store: "eBay",
+              url: `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}`,
+              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/EBay_logo.svg/512px-EBay_logo.svg.png",
+              similarity: 90
+            },
+            {
+              name: `Search Images for "${searchQuery}"`,
+              brand: brand || "Google Images",
+              price: "View Matches",
+              store: "Google Images",
+              url: `https://www.google.com/search?tbm=isch&q=${encodedQuery}`,
+              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Images_2015_logo.svg/640px-Google_Images_2015_logo.svg.png",
+              similarity: 85
+            }
           ];
 
-          const [searchResults] = await Promise.all(searchPromises);
-          
-          const searchContent = searchResults.choices[0]?.message?.content;
-          if (typeof searchContent === "string") {
-            const parsed = JSON.parse(searchContent);
-            return {
-              ...parsed,
-              searchQuery,
-              identifiedItem
-            };
-          }
-          
           return { 
             success: true, 
-            matches: [],
+            matches: realSearchMatches,
             searchQuery,
             identifiedItem,
-            message: "No exact matches found. Try adding more details."
+            message: "Found search links for your item."
           };
         } catch (error) {
           console.error("Reverse image search error:", error);
@@ -570,22 +600,40 @@ IMPORTANT: First check if this HTML is a valid product page. If the HTML appears
 
 Then return: { "success": false, "error": "This appears to be a protection page, not a product page" }
 
-If it IS a valid product page, extract the following details from the HTML:
+If it IS a valid product page, extract ALL of the following details from the HTML:
+
+BASIC INFO:
 - Product name/title
 - Brand name
-- Price (numeric value)
-- Currency
+- Price (numeric value) and Currency
 - Color options or selected color
-- Category (tops, bottoms, shoes, accessories, outerwear, dresses)
-- Specific type (t-shirt, jeans, sneakers, etc.)
+- Category (tops, bottoms, shoes, accessories, outerwear, dresses, swimwear)
+- Specific type (t-shirt, jeans, sneakers, blazer, etc.)
 - Main product image URL (full URL, not relative path)
 - Product description
+
+MATERIALS & FIT:
+- Material/fabric composition (e.g., "100% cotton", "95% polyester, 5% elastane")
+- Care instructions (washing, drying, ironing)
+- Fit type (slim, regular, relaxed, oversized)
+- Available sizes (sizeLabel)
+
+MEASUREMENTS (convert to inches if in cm, very important!):
+Look for size guides, measurement tables, or product dimensions. Extract measurements for a medium/size M if multiple sizes shown:
+- For tops/outerwear: chest, length, shoulder width, sleeve length
+- For bottoms: waist, inseam, rise, hip width, thigh, leg opening
+- For shoes: US size, EU size
+- For dresses: bust, waist, hip, length
+
+SIZE CHART:
+If a size chart is available, extract it as an array with measurements for each size.
 
 Look for:
 - JSON-LD structured data (script type="application/ld+json")
 - Open Graph meta tags (og:title, og:image, og:price)
 - Schema.org markup
-- Common e-commerce HTML patterns (product-title, price, add-to-cart)
+- Size guide sections, measurement tables
+- Common e-commerce HTML patterns
 
 Return accurate data. If a field cannot be determined, omit it.`
               },

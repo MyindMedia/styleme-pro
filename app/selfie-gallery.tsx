@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Dimensions,
   Modal,
-  TouchableOpacity,
   Alert,
   Platform,
 } from "react-native";
@@ -231,7 +230,7 @@ export default function SelfieGalleryScreen() {
             </Text>
             {outfit && outfit.length > 0 && (
               <View style={styles.timelineOutfit}>
-                {outfit.slice(0, 3).map((item, i) => (
+                {outfit.slice(0, 3).map((item, _i) => (
                   <Image
                     key={item.id}
                     source={{ uri: item.imageUri }}

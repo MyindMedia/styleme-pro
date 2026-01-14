@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Text,
   View,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   TextInput,
 } from "react-native";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
@@ -121,6 +121,7 @@ function calculateStreak(logs: WearLog[]): { current: number; longest: number } 
 }
 
 export default function TrackerScreen() {
+  const router = useRouter();
   const colors = useColors();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [wearLogs, setWearLogs] = useState<WearLog[]>([]);
@@ -620,7 +621,7 @@ export default function TrackerScreen() {
                     activeOpacity={0.8}
                   >
                     <View style={styles.outfitGridImages}>
-                      {day.items?.slice(0, 4).map((item, i) => (
+                      {day.items?.slice(0, 4).map((item, _i) => (
                         <Image
                           key={item.id}
                           source={{ uri: item.imageUri }}
@@ -670,7 +671,7 @@ export default function TrackerScreen() {
         >
           <MaterialIcons name="add" size={20} color={colors.background} />
           <Text style={[styles.logButtonText, { color: colors.background }]}>
-            Log Today's Outfit
+            {"Log Today's Outfit"}
           </Text>
         </Pressable>
 
@@ -821,7 +822,7 @@ export default function TrackerScreen() {
             >
               <View style={styles.collageHeader}>
                 <Text style={[styles.collageTitle, { color: colors.foreground }]}>
-                  Today's Fit
+                  {"Today's Fit"}
                 </Text>
                 <Text style={[styles.collageDate, { color: colors.muted }]}>
                   {selectedDay?.date.toLocaleDateString("en-US", { 
@@ -926,7 +927,7 @@ export default function TrackerScreen() {
               <MaterialIcons name="close" size={24} color={colors.foreground} />
             </Pressable>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              Log Today's Outfit
+              {"Log Today's Outfit"}
             </Text>
             <Pressable
               onPress={handleSaveLog}
@@ -1076,7 +1077,7 @@ export default function TrackerScreen() {
 
           <ScrollView contentContainerStyle={styles.compareContent}>
             <View style={styles.compareGrid}>
-              {compareOutfits.map((day, index) => (
+              {compareOutfits.map((day, _index) => (
                 <View key={day.dateStr} style={styles.compareColumn}>
                   <Text style={[styles.compareDate, { color: colors.foreground }]}>
                     {day.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -1120,7 +1121,7 @@ export default function TrackerScreen() {
                   {/* Notes */}
                   {day.log?.notes && (
                     <Text style={[styles.compareNotes, { color: colors.muted }]} numberOfLines={2}>
-                      "{day.log.notes}"
+                      {`"${day.log.notes}"`}
                     </Text>
                   )}
                 </View>
@@ -1371,9 +1372,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  logButton: {
+  logButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
     marginHorizontal: 16,
     marginBottom: 24,
+  },
+  logButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

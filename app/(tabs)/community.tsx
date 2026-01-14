@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Text,
   View,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,

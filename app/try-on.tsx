@@ -162,7 +162,7 @@ export default function TryOnScreen() {
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer showWatermark={true}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>

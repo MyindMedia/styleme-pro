@@ -60,7 +60,7 @@ export default function ForgotPasswordScreen() {
             Check Your Email
           </Text>
           <Text style={[styles.successMessage, { color: colors.muted }]}>
-            We've sent a password reset link to{"\n"}
+            {"We've sent a password reset link to"}{"\n"}
             <Text style={{ color: colors.foreground, fontWeight: "600" }}>{email}</Text>
           </Text>
           <Pressable
@@ -98,7 +98,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Forgot Password?</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>
-              No worries! Enter your email and we'll send you a reset link.
+              {"No worries! Enter your email and we'll send you a reset link."}
             </Text>
           </View>
 

@@ -24,9 +24,9 @@ import {
   generateId,
 } from "@/lib/storage";
 
-const { width, height } = Dimensions.get("window");
+const { width, height: _height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.7;
-const CARD_HEIGHT = CARD_WIDTH * 1.2;
+const _CARD_HEIGHT = CARD_WIDTH * 1.2;
 
 // Categories to shuffle through for outfit building
 const OUTFIT_CATEGORIES: ClothingCategory[] = ["tops", "bottoms", "shoes", "accessories", "outerwear"];
@@ -41,7 +41,7 @@ interface CategorySlot {
 export default function ShuffleScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
+  const [_closetItems, setClosetItems] = useState<ClothingItem[]>([]);
   const [slots, setSlots] = useState<CategorySlot[]>([]);
   const [activeSlotIndex, setActiveSlotIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);

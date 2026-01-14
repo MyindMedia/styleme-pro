@@ -1,10 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  Dimensions,
   StyleSheet,
   Platform,
   ViewToken,
@@ -152,7 +151,7 @@ export default function OnboardingScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       router.replace("/add-item");
-    } catch (error) {
+    } catch (_error) {
       router.replace("/add-item");
     }
   };

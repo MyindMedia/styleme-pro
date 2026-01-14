@@ -24,12 +24,13 @@ interface AuthContextType {
   profile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-
+  isPro: boolean; // Mocked Pro status
+  
   // Auth methods
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook") => Promise<{ error: AuthError | null }>;
-  setSessionManually: (accessToken: string, refreshToken: string) => Promise<{ error: AuthError | null }>; // Add this
+  setSessionManually: (accessToken: string, refreshToken: string) => Promise<{ error: AuthError | null }>; 
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
@@ -37,6 +38,7 @@ interface AuthContextType {
   // Profile methods
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
+  upgradeToPro: () => Promise<void>; // Mock upgrade
 
   // Storage helpers
   getUserStoragePath: () => string;
@@ -50,8 +52,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false); // Default to free
 
   const isAuthenticated = !!user && !!session;
+
+  // Mock function to upgrade user
+  const upgradeToPro = async () => {
+    setIsPro(true);
+    Alert.alert("Welcome to Pro!", "You now have access to all premium features.");
+  };
 
   // Fetch user profile from database
   const fetchProfile = useCallback(async (userId: string) => {
@@ -319,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     isLoading,
     isAuthenticated,
+    isPro,
     signUp,
     signIn,
     signInWithOAuth,
@@ -328,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updatePassword,
     updateProfile,
     refreshProfile,
+    upgradeToPro,
     getUserStoragePath,
     getStorageUsagePercent,
   };

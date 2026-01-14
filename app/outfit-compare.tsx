@@ -20,7 +20,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { ClothingItem, WearLog, getClothingItems, getWearLogs } from "@/lib/storage";
 
-const { width } = Dimensions.get("window");
+const { width: _width } = Dimensions.get("window");
 const SELFIE_STORAGE_KEY = "fitcheck_outfit_selfies";
 
 interface OutfitSelfie {

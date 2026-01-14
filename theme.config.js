@@ -1,19 +1,19 @@
 /** @type {const} */
 const themeColors = {
-  // High-Fashion Minimalist Palette (matching reference design)
-  primary: { light: '#0A0A0A', dark: '#FFFFFF' },
-  background: { light: '#FFFFFF', dark: '#0A0A0A' },
-  surface: { light: '#F5F5F5', dark: '#1A1A1A' },
-  foreground: { light: '#0A0A0A', dark: '#FAFAFA' },
-  muted: { light: '#525252', dark: '#A3A3A3' },
-  border: { light: '#E8E8E8', dark: '#2A2A2A' },
+  // Minimalist "StyleMe" Palette (Charcoal, Cream, Beige)
+  primary: { light: '#2A2A2A', dark: '#FAFAF8' }, // Soft Charcoal / Warm White
+  background: { light: '#FAFAF8', dark: '#2A2A2A' }, // Warm White / Soft Charcoal
+  surface: { light: '#FFFFFF', dark: '#383838' }, // Pure White / Lighter Charcoal
+  foreground: { light: '#2A2A2A', dark: '#FAFAF8' },
+  muted: { light: '#8F8F8F', dark: '#A3A3A3' },
+  border: { light: '#E3DDD5', dark: '#4A4A4A' }, // Beige border / Dark Grey border
   success: { light: '#10B981', dark: '#34D399' },
   warning: { light: '#F59E0B', dark: '#FBBF24' },
   error: { light: '#EF4444', dark: '#F87171' },
   // Card backgrounds
-  card: { light: '#FAFAFA', dark: '#151515' },
-  // Accent for highlights
-  accent: { light: '#D4AF37', dark: '#D4AF37' },
+  card: { light: '#FFFFFF', dark: '#383838' },
+  // Accent for highlights (Beige/Tan from the icon)
+  accent: { light: '#D4C5B5', dark: '#D4C5B5' },
 };
 
 module.exports = { themeColors };

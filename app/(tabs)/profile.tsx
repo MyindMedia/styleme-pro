@@ -19,8 +19,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { getClosetStats, ClothingCategory } from "@/lib/storage";
+import { scheduleDailyReminder, cancelNotifications, registerForPushNotificationsAsync } from "@/lib/notifications";
 
-const { width } = Dimensions.get("window");
+const { width: _width } = Dimensions.get("window");
 
 const CATEGORY_ICONS: Record<ClothingCategory, string> = {
   tops: "checkroom",
@@ -37,7 +38,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [_darkMode, setDarkMode] = useState(false);
 
   const loadStats = useCallback(async () => {
     const data = await getClosetStats();
@@ -458,12 +459,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderRadius: 16,
     gap: 8,
   },
   quickActionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
   },
   proBanner: {

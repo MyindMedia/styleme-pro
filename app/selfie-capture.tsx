@@ -1,516 +1,548 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Text,
   View,
-  Pressable,
   StyleSheet,
+  TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  Image,
+  SafeAreaView,
+  FlatList,
   Platform,
 } from "react-native";
-import { Image } from "expo-image";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Image as ExpoImage } from "expo-image";
+import ViewShot, { captureRef } from "react-native-view-shot";
 
-import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import {
-  WearLog,
-  ClothingItem,
-  getWearLogs,
-  getClothingItems,
-  generateId,
+import { 
+  getClothingItems, 
+  saveWearLog, 
+  generateId, 
+  ClothingItem, 
+  WearLog, 
+  MoodTag 
 } from "@/lib/storage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { shareToInstagramStories } from "@/lib/sharing";
+import { ShareTemplate } from "@/components/share-template";
 
-const SELFIE_STORAGE_KEY = "fitcheck_outfit_selfies";
-
-export interface OutfitSelfie {
-  id: string;
-  imageUri: string;
-  wearLogId?: string;
-  date: string;
-  notes?: string;
-  location?: string;
-  createdAt: string;
-}
-
-// Storage functions for selfies
-async function getSelfies(): Promise<OutfitSelfie[]> {
-  try {
-    const data = await AsyncStorage.getItem(SELFIE_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveSelfie(selfie: OutfitSelfie): Promise<void> {
-  const selfies = await getSelfies();
-  selfies.unshift(selfie);
-  await AsyncStorage.setItem(SELFIE_STORAGE_KEY, JSON.stringify(selfies));
-}
+const MOOD_TAGS: { tag: MoodTag; emoji: string; label: string }[] = [
+  { tag: "confident", emoji: "💪", label: "Confident" },
+  { tag: "comfortable", emoji: "😌", label: "Comfortable" },
+  { tag: "stylish", emoji: "✨", label: "Stylish" },
+  { tag: "casual", emoji: "👕", label: "Casual" },
+  { tag: "professional", emoji: "💼", label: "Professional" },
+  { tag: "creative", emoji: "🎨", label: "Creative" },
+  { tag: "cozy", emoji: "🧣", label: "Cozy" },
+  { tag: "bold", emoji: "🔥", label: "Bold" },
+  { tag: "minimal", emoji: "⚪", label: "Minimal" },
+  { tag: "elegant", emoji: "👗", label: "Elegant" },
+];
 
 export default function SelfieCaptureScreen() {
-  const colors = useColors();
   const router = useRouter();
-  const params = useLocalSearchParams<{ wearLogId?: string; date?: string }>();
-  
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [wearLog, setWearLog] = useState<WearLog | null>(null);
-  const [outfitItems, setOutfitItems] = useState<ClothingItem[]>([]);
+  const colors = useColors();
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>("front");
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [timer, setTimer] = useState<0 | 3 | 10>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [step, setStep] = useState<"camera" | "preview" | "tagging">("camera");
+
+  // Tagging State
+  const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedMoods, setSelectedMoods] = useState<MoodTag[]>([]);
   const [notes, setNotes] = useState("");
+  
+  const shareRef = useRef<ViewShot>(null);
 
-  // Load wear log data if provided
   useEffect(() => {
-    const loadWearLog = async () => {
-      if (params.wearLogId) {
-        const logs = await getWearLogs();
-        const log = logs.find(l => l.id === params.wearLogId);
-        if (log) {
-          setWearLog(log);
-          const items = await getClothingItems();
-          const logItems = items.filter(item => log.itemIds.includes(item.id));
-          setOutfitItems(logItems);
-        }
-      }
-    };
-    loadWearLog();
-  }, [params.wearLogId]);
+    loadCloset();
+  }, []);
 
-  const requestPermissions = async () => {
-    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-    const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
-    
-    if (cameraStatus !== "granted") {
-      Alert.alert(
-        "Camera Permission Required",
-        "Please enable camera access in your device settings to take outfit selfies."
-      );
-      return false;
-    }
-    return true;
+  const loadCloset = async () => {
+    const items = await getClothingItems();
+    setClosetItems(items);
   };
 
-  const takePhoto = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+  if (!permission) {
+    // Camera permissions are still loading.
+    return <View />;
+  }
 
-    setIsCapturing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  if (!permission.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ textAlign: 'center', color: colors.foreground, marginBottom: 20 }}>
+          We need your permission to show the camera
+        </Text>
+        <TouchableOpacity onPress={requestPermission} style={[styles.button, { backgroundColor: colors.primary }]}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.8,
-        cameraType: ImagePicker.CameraType.front,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    } catch (error) {
-      console.error("Camera error:", error);
-      Alert.alert("Error", "Failed to capture photo. Please try again.");
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const pickFromGallery = async () => {
+  const toggleCameraFacing = () => {
+    setFacing((current) => (current === "back" ? "front" : "back"));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.8,
-      });
+  const toggleTimer = () => {
+    if (timer === 0) setTimer(3);
+    else if (timer === 3) setTimer(10);
+    else setTimer(0);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
-      if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Gallery error:", error);
-      Alert.alert("Error", "Failed to select photo. Please try again.");
+  const takePicture = async () => {
+    if (!cameraRef.current) return;
+
+    if (timer > 0) {
+      let count = timer;
+      setCountdown(count);
+      const interval = setInterval(() => {
+        count--;
+        setCountdown(count);
+        if (count === 0) {
+          clearInterval(interval);
+          setCountdown(null);
+          performCapture();
+        }
+      }, 1000);
+    } else {
+      performCapture();
     }
   };
 
-  const handleSave = async () => {
-    if (!imageUri) {
-      Alert.alert("No Photo", "Please take or select a photo first.");
-      return;
-    }
-
-    setIsSaving(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+  const performCapture = async () => {
+    if (!cameraRef.current) return;
     try {
-      const selfie: OutfitSelfie = {
-        id: generateId(),
-        imageUri,
-        wearLogId: params.wearLogId,
-        date: params.date || new Date().toISOString().slice(0, 10),
-        notes: notes.trim() || undefined,
-        createdAt: new Date().toISOString(),
-      };
-
-      await saveSelfie(selfie);
-
-      // Save to device gallery
-      if (Platform.OS !== "web") {
-        try {
-          await MediaLibrary.saveToLibraryAsync(imageUri);
-        } catch (e) {
-          console.log("Could not save to gallery:", e);
-        }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        skipProcessing: false,
+      });
+      if (photo) {
+        setCapturedImage(photo.uri);
+        setStep("preview");
       }
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        "Selfie Saved!",
-        "Your outfit selfie has been added to your style diary.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
-    } catch (error) {
-      console.error("Save error:", error);
-      Alert.alert("Error", "Failed to save selfie. Please try again.");
-    } finally {
-      setIsSaving(false);
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to take picture");
     }
   };
 
   const handleRetake = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setImageUri(null);
+    setCapturedImage(null);
+    setStep("camera");
+    setSelectedItems([]);
+    setSelectedMoods([]);
+    setNotes("");
   };
 
-  return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <MaterialIcons name="close" size={24} color={colors.foreground} />
-        </Pressable>
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          Outfit Selfie
-        </Text>
-        {imageUri ? (
-          <Pressable
-            onPress={handleSave}
-            disabled={isSaving}
-            style={({ pressed }) => [
-              styles.saveButton,
-              {
-                backgroundColor: colors.primary,
-                opacity: isSaving ? 0.5 : pressed ? 0.8 : 1,
-              },
-            ]}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.background} />
-            ) : (
-              <Text style={[styles.saveText, { color: colors.background }]}>Save</Text>
-            )}
-          </Pressable>
-        ) : (
-          <View style={{ width: 60 }} />
-        )}
-      </View>
+  const handleConfirmPhoto = () => {
+    setStep("tagging");
+  };
 
-      {/* Content */}
-      <View style={styles.content}>
-        {imageUri ? (
-          // Photo Preview
-          <View style={styles.previewContainer}>
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.previewImage}
-              contentFit="cover"
-            />
-            <Pressable
-              onPress={handleRetake}
-              style={[styles.retakeButton, { backgroundColor: colors.surface }]}
-            >
-              <MaterialIcons name="refresh" size={20} color={colors.foreground} />
-              <Text style={[styles.retakeText, { color: colors.foreground }]}>Retake</Text>
-            </Pressable>
-          </View>
-        ) : (
-          // Camera View
-          <View style={styles.cameraContainer}>
-            <View style={[styles.cameraPlaceholder, { backgroundColor: colors.surface }]}>
-              <MaterialIcons name="person" size={80} color={colors.muted} />
-              <Text style={[styles.placeholderText, { color: colors.muted }]}>
-                Strike a pose!
-              </Text>
+  const toggleItemSelection = (id: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const toggleMoodSelection = (tag: MoodTag) => {
+    setSelectedMoods((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleSave = async () => {
+    if (!capturedImage) return;
+
+    try {
+      // 1. Save photo to gallery (optional, but good UX)
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === "granted") {
+        await MediaLibrary.saveToLibraryAsync(capturedImage);
+      }
+
+      // 2. Create WearLog
+      const newLog: WearLog = {
+        id: generateId(),
+        date: new Date().toISOString(),
+        itemIds: selectedItems,
+        sharedToCommunity: false,
+        imageUri: capturedImage,
+        notes: notes || undefined,
+        moodTags: selectedMoods.length > 0 ? selectedMoods : undefined,
+      };
+
+      await saveWearLog(newLog);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved!", "Your fit check has been logged.", [
+        { text: "OK", onPress: () => router.replace("/(tabs)/tracker") }
+      ]);
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to save outfit");
+    }
+  };
+
+  if (step === "camera") {
+    return (
+      <View style={styles.container}>
+        <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+          <SafeAreaView style={styles.cameraUi}>
+            {/* Top Bar */}
+            <View style={styles.topBar}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
+                <MaterialIcons name="close" size={28} color="white" />
+              </TouchableOpacity>
+              <View style={styles.watermarkContainer}>
+                <Text style={styles.watermarkText}>FIT CHECK</Text>
+              </View>
+              <TouchableOpacity onPress={toggleTimer} style={styles.iconButton}>
+                <MaterialIcons name={timer === 0 ? "timer-off" : timer === 3 ? "timer-3" : "timer-10"} size={28} color={timer > 0 ? colors.primary : "white"} />
+              </TouchableOpacity>
             </View>
 
-            {/* Outfit Preview */}
-            {outfitItems.length > 0 && (
-              <View style={[styles.outfitPreview, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.outfitLabel, { color: colors.foreground }]}>
-                  Today's Outfit
-                </Text>
-                <View style={styles.outfitItems}>
-                  {outfitItems.slice(0, 4).map((item, index) => (
-                    <Image
-                      key={item.id}
-                      source={{ uri: item.imageUri }}
-                      style={styles.outfitItemImage}
-                      contentFit="cover"
-                    />
-                  ))}
-                  {outfitItems.length > 4 && (
-                    <View style={[styles.moreItems, { backgroundColor: colors.primary }]}>
-                      <Text style={[styles.moreItemsText, { color: colors.background }]}>
-                        +{outfitItems.length - 4}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+            {/* Countdown Overlay */}
+            {countdown !== null && (
+              <View style={styles.countdownOverlay}>
+                <Text style={styles.countdownText}>{countdown}</Text>
               </View>
             )}
 
-            {/* Capture Buttons */}
-            <View style={styles.captureActions}>
-              <Pressable
-                onPress={pickFromGallery}
-                style={({ pressed }) => [
-                  styles.galleryButton,
-                  { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <MaterialIcons name="photo-library" size={24} color={colors.foreground} />
-              </Pressable>
-
-              <Pressable
-                onPress={takePhoto}
-                disabled={isCapturing}
-                style={({ pressed }) => [
-                  styles.captureButton,
-                  {
-                    backgroundColor: colors.primary,
-                    opacity: isCapturing ? 0.5 : pressed ? 0.9 : 1,
-                  },
-                ]}
-              >
-                {isCapturing ? (
-                  <ActivityIndicator size="large" color={colors.background} />
-                ) : (
-                  <MaterialIcons name="camera-alt" size={36} color={colors.background} />
-                )}
-              </Pressable>
-
-              <View style={styles.placeholderButton} />
+            {/* Bottom Controls */}
+            <View style={styles.bottomBar}>
+              <View style={{ width: 40 }} /> 
+              <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
+                <View style={styles.captureInner} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleCameraFacing} style={styles.iconButton}>
+                <MaterialIcons name="flip-camera-ios" size={28} color="white" />
+              </TouchableOpacity>
             </View>
-          </View>
-        )}
-
-        {/* Tips */}
-        {!imageUri && (
-          <View style={[styles.tipsCard, { backgroundColor: colors.surface }]}>
-            <MaterialIcons name="lightbulb" size={20} color={colors.warning} />
-            <View style={styles.tipsContent}>
-              <Text style={[styles.tipsTitle, { color: colors.foreground }]}>
-                Selfie Tips
-              </Text>
-              <Text style={[styles.tipsText, { color: colors.muted }]}>
-                • Use natural lighting for best results{"\n"}
-                • Stand in front of a plain background{"\n"}
-                • Show your full outfit from head to toe
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Date Badge */}
-        <View style={[styles.dateBadge, { backgroundColor: colors.surface }]}>
-          <MaterialIcons name="calendar-today" size={16} color={colors.primary} />
-          <Text style={[styles.dateText, { color: colors.foreground }]}>
-            {params.date
-              ? new Date(params.date).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })
-              : new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-          </Text>
-        </View>
+          </SafeAreaView>
+        </CameraView>
       </View>
-    </ScreenContainer>
+    );
+  }
+
+  if (step === "preview" && capturedImage) {
+    return (
+      <View style={[styles.container, { backgroundColor: "black" }]}>
+        <Image source={{ uri: capturedImage }} style={styles.previewImage} resizeMode="cover" />
+        <SafeAreaView style={styles.previewUi}>
+          <View style={styles.previewActions}>
+            <TouchableOpacity onPress={handleRetake} style={styles.previewButton}>
+              <MaterialIcons name="refresh" size={24} color="white" />
+              <Text style={styles.previewButtonText}>Retake</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleConfirmPhoto} style={[styles.previewButton, { backgroundColor: colors.primary, borderRadius: 30, paddingHorizontal: 20 }]}>
+              <Text style={[styles.previewButtonText, { color: "white" }]}>Tag Items</Text>
+              <MaterialIcons name="arrow-forward" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Tagging Step
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {renderShareTemplate()}
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep("preview")} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Tag Your Fit</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <FlatList
+          data={closetItems}
+          keyExtractor={(item) => item.id}
+          numColumns={3}
+          contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.miniPreviewContainer}>
+                <Image source={{ uri: capturedImage! }} style={styles.miniPreview} />
+                <View style={styles.moodSection}>
+                   <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Vibe</Text>
+                   <FlatList 
+                      data={MOOD_TAGS}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyExtractor={item => item.tag}
+                      contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity 
+                          onPress={() => toggleMoodSelection(item.tag)}
+                          style={[
+                            styles.moodChip, 
+                            { 
+                              backgroundColor: selectedItems.includes(item.tag) ? colors.primary : colors.surface,
+                              borderColor: colors.border,
+                              borderWidth: 1
+                            },
+                            selectedMoods.includes(item.tag) && { backgroundColor: colors.primary, borderColor: colors.primary }
+                          ]}
+                        >
+                          <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+                          <Text style={[
+                            styles.moodLabel, 
+                            { color: selectedMoods.includes(item.tag) ? "white" : colors.foreground }
+                          ]}>{item.label}</Text>
+                        </TouchableOpacity>
+                      )}
+                   />
+                </View>
+              </View>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginHorizontal: 16, marginBottom: 12 }]}>
+                What are you wearing?
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => toggleItemSelection(item.id)}
+              style={[
+                styles.gridItem,
+                selectedItems.includes(item.id) && { borderColor: colors.primary, borderWidth: 3 }
+              ]}
+            >
+              <ExpoImage source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" />
+              {selectedItems.includes(item.id) && (
+                <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
+                  <MaterialIcons name="check" size={12} color="white" />
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+        />
+
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <TouchableOpacity 
+            onPress={handleSave}
+            disabled={selectedItems.length === 0}
+            style={[
+              styles.saveButton, 
+              { backgroundColor: selectedItems.length > 0 ? colors.primary : colors.muted }
+            ]}
+          >
+            <Text style={styles.saveButtonText}>Log Outfit</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
+  container: {
+    flex: 1,
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraUi: {
+    flex: 1,
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
-  backButton: {
-    padding: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 60,
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-  },
-  saveText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  content: {
-    flex: 1,
     padding: 16,
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
-  cameraContainer: {
-    flex: 1,
-    gap: 16,
-  },
-  cameraPlaceholder: {
-    flex: 1,
-    borderRadius: 24,
+  bottomBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
+    padding: 30,
+    paddingBottom: 50,
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
-  placeholderText: {
-    fontSize: 18,
-    fontWeight: "600",
+  iconButton: {
+    padding: 8,
   },
-  outfitPreview: {
-    padding: 16,
+  watermarkContainer: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 16,
   },
-  outfitLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  outfitItems: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  outfitItemImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-  },
-  moreItems: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  moreItemsText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  captureActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 32,
-    paddingVertical: 16,
-  },
-  galleryButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
+  watermarkText: {
+    color: "white",
+    fontWeight: "800",
+    letterSpacing: 2,
+    fontSize: 12,
   },
   captureButton: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.3)",
     justifyContent: "center",
+    alignItems: "center",
   },
-  placeholderButton: {
-    width: 56,
-    height: 56,
+  captureInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "white",
   },
-  previewContainer: {
-    flex: 1,
-    position: "relative",
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  countdownText: {
+    fontSize: 120,
+    fontWeight: "bold",
+    color: "white",
   },
   previewImage: {
     flex: 1,
-    borderRadius: 24,
   },
-  retakeButton: {
+  previewUi: {
     position: "absolute",
-    bottom: 16,
-    left: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+  },
+  previewActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  previewButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
+    gap: 8,
+    padding: 12,
   },
-  retakeText: {
-    fontSize: 14,
+  previewButtonText: {
+    color: "white",
+    fontSize: 16,
     fontWeight: "600",
   },
-  tipsCard: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  backButton: {
+    padding: 4,
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  miniPreviewContainer: {
     flexDirection: "row",
     padding: 16,
-    borderRadius: 16,
-    gap: 12,
-    marginTop: 16,
+    gap: 16,
   },
-  tipsContent: {
+  miniPreview: {
+    width: 100,
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: "#eee",
+  },
+  moodSection: {
     flex: 1,
   },
-  tipsTitle: {
-    fontSize: 14,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  tipsText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  dateBadge: {
+  moodChip: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
-    gap: 8,
-    marginTop: 16,
+    gap: 6,
+    marginRight: 8,
   },
-  dateText: {
-    fontSize: 14,
-    fontWeight: "500",
+  moodLabel: {
+    fontSize: 12,
+    fontWeight: "600",
   },
+  gridItem: {
+    flex: 1/3,
+    aspectRatio: 1,
+    margin: 4,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  checkBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    borderTopWidth: 1,
+    backgroundColor: "white", // Should be dynamic based on theme, but keeping simple for now
+  },
+  saveButton: {
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  button: {
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center'
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600'
+  }
 });

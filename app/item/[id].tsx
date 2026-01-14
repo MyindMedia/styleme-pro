@@ -17,12 +17,13 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import {
   ClothingItem,
+  GarmentMeasurements,
   getClothingItems,
   deleteClothingItem,
   calculateCostPerWear,
 } from "@/lib/storage";
 
-const { width, height } = Dimensions.get("window");
+const { width: _width, height } = Dimensions.get("window");
 
 const CATEGORY_LABELS: Record<string, string> = {
   tops: "Top",
@@ -30,6 +31,72 @@ const CATEGORY_LABELS: Record<string, string> = {
   shoes: "Shoes",
   accessories: "Accessory",
   outerwear: "Outerwear",
+  dresses: "Dress",
+  swimwear: "Swimwear",
+};
+
+const CONDITION_LABELS: Record<string, string> = {
+  new: "New with tags",
+  "like-new": "Like new",
+  good: "Good condition",
+  fair: "Fair condition",
+  worn: "Well worn",
+};
+
+const FIT_LABELS: Record<string, string> = {
+  slim: "Slim fit",
+  regular: "Regular fit",
+  relaxed: "Relaxed fit",
+  oversized: "Oversized",
+};
+
+const STRETCH_LABELS: Record<string, string> = {
+  none: "No stretch",
+  slight: "Slight stretch",
+  moderate: "Moderate stretch",
+  high: "High stretch",
+};
+
+// Measurement labels by category
+const MEASUREMENT_CONFIG: Record<string, { key: keyof GarmentMeasurements; label: string; unit: string }[]> = {
+  tops: [
+    { key: "chest", label: "Chest", unit: '"' },
+    { key: "length", label: "Length", unit: '"' },
+    { key: "shoulderWidth", label: "Shoulder", unit: '"' },
+    { key: "sleeveLength", label: "Sleeve", unit: '"' },
+    { key: "waist", label: "Waist", unit: '"' },
+  ],
+  bottoms: [
+    { key: "waist", label: "Waist", unit: '"' },
+    { key: "inseam", label: "Inseam", unit: '"' },
+    { key: "rise", label: "Rise", unit: '"' },
+    { key: "thigh", label: "Thigh", unit: '"' },
+    { key: "legOpening", label: "Leg Opening", unit: '"' },
+    { key: "hipWidth", label: "Hip", unit: '"' },
+  ],
+  dresses: [
+    { key: "chest", label: "Bust", unit: '"' },
+    { key: "waist", label: "Waist", unit: '"' },
+    { key: "hipWidth", label: "Hip", unit: '"' },
+    { key: "bustToHem", label: "Length", unit: '"' },
+    { key: "shoulderWidth", label: "Shoulder", unit: '"' },
+  ],
+  outerwear: [
+    { key: "chest", label: "Chest", unit: '"' },
+    { key: "length", label: "Length", unit: '"' },
+    { key: "shoulderWidth", label: "Shoulder", unit: '"' },
+    { key: "sleeveLength", label: "Sleeve", unit: '"' },
+  ],
+  shoes: [
+    { key: "usSize", label: "US Size", unit: "" },
+    { key: "euSize", label: "EU Size", unit: "" },
+  ],
+  accessories: [],
+  swimwear: [
+    { key: "chest", label: "Bust", unit: '"' },
+    { key: "waist", label: "Waist", unit: '"' },
+    { key: "hipWidth", label: "Hip", unit: '"' },
+  ],
 };
 
 export default function ItemDetailScreen() {
@@ -37,6 +104,20 @@ export default function ItemDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [item, setItem] = useState<ClothingItem | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    details: false,
+    measurements: false,
+    stats: false,
+    resale: false,
+  });
+
+  const toggleSection = (section: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
 
   useEffect(() => {
     const loadItem = async () => {
@@ -190,26 +271,246 @@ export default function ItemDetailScreen() {
 
         {/* Expandable Sections */}
         <View style={styles.sectionsContainer}>
-          <Pressable style={[styles.expandableSection, { borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
-              Product details
-            </Text>
-            <MaterialIcons name="expand-more" size={20} color={colors.muted} />
-          </Pressable>
+          {/* Product Details Section */}
+          <View>
+            <Pressable
+              onPress={() => toggleSection("details")}
+              style={[styles.expandableSection, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
+                Product Details
+              </Text>
+              <MaterialIcons
+                name={expandedSections.details ? "expand-less" : "expand-more"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
+            {expandedSections.details && (
+              <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}>
+                {item.fabric && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="layers" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Material</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>{item.fabric}</Text>
+                  </View>
+                )}
+                {item.condition && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="star" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Condition</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                      {CONDITION_LABELS[item.condition] || item.condition}
+                    </Text>
+                  </View>
+                )}
+                {item.size && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="straighten" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Size</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>{item.size}</Text>
+                  </View>
+                )}
+                {item.style && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="style" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Style</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                      {item.style.charAt(0).toUpperCase() + item.style.slice(1)}
+                    </Text>
+                  </View>
+                )}
+                {item.type && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="category" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Type</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                      {item.type.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </Text>
+                  </View>
+                )}
+                {item.productUrl && (
+                  <Pressable
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      // Could open URL in browser
+                    }}
+                    style={styles.detailRow}
+                  >
+                    <MaterialIcons name="link" size={18} color={colors.primary} />
+                    <Text style={[styles.detailLabel, { color: colors.primary }]}>View Original</Text>
+                    <MaterialIcons name="open-in-new" size={16} color={colors.primary} />
+                  </Pressable>
+                )}
+                {!item.fabric && !item.condition && !item.size && !item.style && (
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>
+                    No additional details available
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
 
-          <Pressable style={[styles.expandableSection, { borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
-              Wear Statistics
-            </Text>
-            <MaterialIcons name="expand-more" size={20} color={colors.muted} />
-          </Pressable>
+          {/* Measurements Section */}
+          <View>
+            <Pressable
+              onPress={() => toggleSection("measurements")}
+              style={[styles.expandableSection, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
+                Measurements
+              </Text>
+              <MaterialIcons
+                name={expandedSections.measurements ? "expand-less" : "expand-more"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
+            {expandedSections.measurements && (
+              <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}>
+                {item.measurements ? (
+                  <>
+                    {/* Size Label & Fit */}
+                    <View style={styles.measurementHeader}>
+                      {item.measurements.sizeLabel && (
+                        <View style={[styles.sizeBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={[styles.sizeBadgeText, { color: colors.background }]}>
+                            {item.measurements.sizeLabel}
+                          </Text>
+                        </View>
+                      )}
+                      {item.measurements.fit && (
+                        <Text style={[styles.fitText, { color: colors.muted }]}>
+                          {FIT_LABELS[item.measurements.fit] || item.measurements.fit}
+                        </Text>
+                      )}
+                      {item.measurements.stretchLevel && (
+                        <Text style={[styles.stretchText, { color: colors.muted }]}>
+                          {STRETCH_LABELS[item.measurements.stretchLevel]}
+                        </Text>
+                      )}
+                    </View>
 
-          <Pressable style={[styles.expandableSection, { borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
-              Resale Value
-            </Text>
-            <MaterialIcons name="expand-more" size={20} color={colors.muted} />
-          </Pressable>
+                    {/* Measurements Grid */}
+                    <View style={styles.measurementsGrid}>
+                      {(MEASUREMENT_CONFIG[item.category] || []).map(({ key, label, unit }) => {
+                        const value = item.measurements?.[key];
+                        if (value === undefined || value === null) return null;
+                        return (
+                          <View key={key} style={[styles.measurementItem, { borderColor: colors.border }]}>
+                            <Text style={[styles.measurementLabel, { color: colors.muted }]}>{label}</Text>
+                            <Text style={[styles.measurementValue, { color: colors.foreground }]}>
+                              {value}{unit}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* No measurements found */}
+                    {(MEASUREMENT_CONFIG[item.category] || []).every(
+                      ({ key }) => item.measurements?.[key] === undefined
+                    ) && (
+                      <Text style={[styles.emptyText, { color: colors.muted }]}>
+                        No measurements recorded
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>
+                    No measurements available. Add measurements when editing this item.
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Wear Statistics Section */}
+          <View>
+            <Pressable
+              onPress={() => toggleSection("stats")}
+              style={[styles.expandableSection, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
+                Wear Statistics
+              </Text>
+              <MaterialIcons
+                name={expandedSections.stats ? "expand-less" : "expand-more"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
+            {expandedSections.stats && (
+              <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="repeat" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Times Worn</Text>
+                  <Text style={[styles.detailValue, { color: colors.foreground }]}>{item.wearCount}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="attach-money" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Cost Per Wear</Text>
+                  <Text style={[styles.detailValue, { color: colors.foreground }]}>${costPerWear.toFixed(2)}</Text>
+                </View>
+                {item.lastWornAt && (
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="schedule" size={18} color={colors.muted} />
+                    <Text style={[styles.detailLabel, { color: colors.muted }]}>Last Worn</Text>
+                    <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                      {new Date(item.lastWornAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="event" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Added</Text>
+                  <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Resale Value Section */}
+          <View>
+            <Pressable
+              onPress={() => toggleSection("resale")}
+              style={[styles.expandableSection, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
+                Resale Value
+              </Text>
+              <MaterialIcons
+                name={expandedSections.resale ? "expand-less" : "expand-more"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
+            {expandedSections.resale && (
+              <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="shopping-bag" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Purchase Price</Text>
+                  <Text style={[styles.detailValue, { color: colors.foreground }]}>${item.purchasePrice.toFixed(2)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="trending-down" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Current Value</Text>
+                  <Text style={[styles.detailValue, { color: colors.foreground }]}>
+                    ${(item.currentValue || item.purchasePrice * 0.6).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="percent" size={18} color={colors.muted} />
+                  <Text style={[styles.detailLabel, { color: colors.muted }]}>Depreciation</Text>
+                  <Text style={[styles.detailValue, { color: colors.warning }]}>
+                    -{Math.round(((item.purchasePrice - (item.currentValue || item.purchasePrice * 0.6)) / item.purchasePrice) * 100)}%
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Stats Cards */}
@@ -404,6 +705,72 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 15,
     fontWeight: "500",
+  },
+  sectionContent: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    gap: 12,
+  },
+  detailLabel: {
+    flex: 1,
+    fontSize: 14,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 16,
+  },
+  measurementHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  sizeBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  sizeBadgeText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  fitText: {
+    fontSize: 14,
+  },
+  stretchText: {
+    fontSize: 14,
+  },
+  measurementsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  measurementItem: {
+    width: "46%",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  measurementLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  measurementValue: {
+    fontSize: 18,
+    fontWeight: "700",
   },
   statsSection: {
     flexDirection: "row",

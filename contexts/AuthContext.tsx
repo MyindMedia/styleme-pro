@@ -63,17 +63,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Fetch user profile from database
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (user: User) => {
     try {
       const { data, error } = await supabase
         .from("user_profiles")
         .select("*")
-        .eq("id", userId)
+        .eq("id", user.id)
         .single();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
-        return null;
+      if (error || !data) {
+        // Create minimal profile if missing
+        return {
+          id: user.id,
+          email: user.email || null,
+          full_name: user.user_metadata.full_name || "User",
+          avatar_url: null,
+          storage_used: 0,
+          storage_limit: 104857600, // 100MB
+          preferences: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as UserProfile;
       }
 
       return data as UserProfile;
@@ -87,23 +97,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
+    // Set a timeout to force loading to false if Supabase takes too long
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn("[AuthContext] Session check timed out, forcing loading=false");
+        setIsLoading(false);
+      }
+    }, 5000); // 5 seconds timeout
+
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return;
 
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (session) {
+        setSession(session);
+        setUser(session.user);
 
-      if (session?.user) {
-        const userProfile = await fetchProfile(session.user.id);
+        const userProfile = await fetchProfile(session.user);
         if (isMounted) {
           setProfile(userProfile);
         }
+      } else {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
       }
 
       if (isMounted) {
         setIsLoading(false);
       }
+      clearTimeout(timeoutId);
+    }).catch(err => {
+      console.error("[AuthContext] Session check failed:", err);
+      if (isMounted) setIsLoading(false);
     });
 
     // Listen for auth changes
@@ -117,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id);
+          const userProfile = await fetchProfile(session.user);
           if (isMounted) {
             setProfile(userProfile);
           }
@@ -131,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
@@ -215,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(data.session);
         setUser(data.session.user);
         // Fetch profile immediately
-        const userProfile = await fetchProfile(data.session.user.id);
+        const userProfile = await fetchProfile(data.session.user);
         setProfile(userProfile);
         // Force loading to false immediately
         setIsLoading(false);
@@ -293,7 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Refresh profile
-      const updatedProfile = await fetchProfile(user.id);
+      const updatedProfile = await fetchProfile(user);
       setProfile(updatedProfile);
 
       return { error: null };
@@ -305,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Refresh profile from database
   const refreshProfile = async () => {
     if (user) {
-      const updatedProfile = await fetchProfile(user.id);
+      const updatedProfile = await fetchProfile(user);
       setProfile(updatedProfile);
     }
   };

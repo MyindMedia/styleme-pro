@@ -24,6 +24,7 @@ import {
   getOutfits,
   Outfit,
 } from "@/lib/storage";
+import { performFullSync } from "@/lib/cloud-sync";
 
 const ONBOARDING_KEY = "@fitcheck_onboarding_complete";
 

@@ -105,6 +105,11 @@ const config: ExpoConfig = {
     typedRoutes: true,
     reactCompiler: true,
   },
+  extra: {
+    eas: {
+      projectId: "81a0e8aa-a7b1-4650-8e4a-b17464d75ab1",
+    },
+  },
 };
 
 export default config;

@@ -20,6 +20,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { getClosetStats, ClothingCategory } from "@/lib/storage";
 import { scheduleDailyReminder, cancelNotifications, registerForPushNotificationsAsync } from "@/lib/notifications";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { width: _width } = Dimensions.get("window");
 
@@ -38,12 +39,13 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { user, profile, isAuthenticated, isPro, signOut, upgradeToPro } = useAuth();
   const [_darkMode, setDarkMode] = useState(false);
 
   const loadStats = useCallback(async () => {
     const data = await getClosetStats();
     setStats(data);
-    
+
     // Load settings
     const notifications = await AsyncStorage.getItem("notifications_enabled");
     setNotificationsEnabled(notifications === "true");
@@ -57,14 +59,11 @@ export default function ProfileScreen() {
 
   const handleEditProfile = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      "Edit Profile",
-      "Profile editing will be available after signing in with your account.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign In", onPress: () => Alert.alert("Coming Soon", "Sign in feature is coming soon!") },
-      ]
-    );
+    if (!isAuthenticated) {
+      router.push("/auth/login");
+    } else {
+      Alert.alert("Edit Profile", "Profile editing is coming soon to the app!");
+    }
   };
 
   const handleNotifications = async () => {
@@ -74,8 +73,8 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem("notifications_enabled", newValue.toString());
     Alert.alert(
       newValue ? "Notifications Enabled" : "Notifications Disabled",
-      newValue 
-        ? "You'll receive daily outfit reminders and style tips." 
+      newValue
+        ? "You'll receive daily outfit reminders and style tips."
         : "You won't receive any notifications."
     );
   };
@@ -86,14 +85,18 @@ export default function ProfileScreen() {
       "Appearance",
       "Choose your preferred theme",
       [
-        { text: "Light Mode", onPress: async () => {
-          setDarkMode(false);
-          await AsyncStorage.setItem("dark_mode", "false");
-        }},
-        { text: "Dark Mode", onPress: async () => {
-          setDarkMode(true);
-          await AsyncStorage.setItem("dark_mode", "true");
-        }},
+        {
+          text: "Light Mode", onPress: async () => {
+            setDarkMode(false);
+            await AsyncStorage.setItem("dark_mode", "false");
+          }
+        },
+        {
+          text: "Dark Mode", onPress: async () => {
+            setDarkMode(true);
+            await AsyncStorage.setItem("dark_mode", "true");
+          }
+        },
         { text: "Cancel", style: "cancel" },
       ]
     );
@@ -105,20 +108,24 @@ export default function ProfileScreen() {
       "Privacy Settings",
       "Manage your data and privacy preferences",
       [
-        { text: "Clear All Data", style: "destructive", onPress: () => {
-          Alert.alert(
-            "Clear All Data?",
-            "This will delete all your closet items, outfits, and settings. This cannot be undone.",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Clear", style: "destructive", onPress: async () => {
-                await AsyncStorage.clear();
-                Alert.alert("Data Cleared", "All your data has been deleted.");
-                loadStats();
-              }},
-            ]
-          );
-        }},
+        {
+          text: "Clear All Data", style: "destructive", onPress: () => {
+            Alert.alert(
+              "Clear All Data?",
+              "This will delete all your closet items, outfits, and settings. This cannot be undone.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear", style: "destructive", onPress: async () => {
+                    await AsyncStorage.clear();
+                    Alert.alert("Data Cleared", "All your data has been deleted.");
+                    loadStats();
+                  }
+                },
+              ]
+            );
+          }
+        },
         { text: "Export My Data", onPress: () => Alert.alert("Coming Soon", "Data export feature is coming soon!") },
         { text: "Cancel", style: "cancel" },
       ]
@@ -150,26 +157,34 @@ export default function ProfileScreen() {
 
   const handleUpgradePro = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (isPro) {
+      Alert.alert("Pro Active", "You are already a Pro member! Thank you for your support.");
+      return;
+    }
     Alert.alert(
       "Upgrade to Pro",
-      "Unlock premium features:\n\n✓ Unlimited closet items\n✓ Virtual Try-On\n✓ Advanced AI styling\n✓ Priority support\n✓ No ads\n\n$14.99/month or $99.99/year",
+      "Unlock premium features:\n\n✓ Unlimited closet items\n✓ Virtual Try-On\n✓ Advanced AI styling\n✓ Priority support\n✓ No ads",
       [
         { text: "Maybe Later", style: "cancel" },
-        { text: "Subscribe", onPress: () => Alert.alert("Coming Soon", "In-app purchases will be available soon!") },
+        { text: "Subscribe", onPress: () => upgradeToPro() },
       ]
     );
   };
 
   const handleSignOut = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      "Sign Out",
-      "You're currently using FitCheck as a guest. Sign in to sync your wardrobe across devices.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign In", onPress: () => Alert.alert("Coming Soon", "Sign in feature is coming soon!") },
-      ]
-    );
+    if (isAuthenticated) {
+      Alert.alert(
+        "Sign Out",
+        "Are you sure you want to sign out?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign Out", style: "destructive", onPress: () => signOut() },
+        ]
+      );
+    } else {
+      router.push("/auth/login");
+    }
   };
 
   const menuItems = [
@@ -191,31 +206,55 @@ export default function ProfileScreen() {
 
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-          <View style={[styles.avatar, { backgroundColor: "transparent" }]}>
-            <Image
-              source={require("@/assets/images/icon.png")}
-              style={{ width: 56, height: 56, borderRadius: 28 }}
-              contentFit="cover"
-            />
+          <View style={[styles.avatar, { backgroundColor: colors.border }]}>
+            {profile?.avatar_url || user?.user_metadata.avatar_url ? (
+              <Image
+                source={{ uri: profile?.avatar_url || user?.user_metadata.avatar_url }}
+                style={{ width: 80, height: 80, borderRadius: 40 }}
+                contentFit="cover"
+              />
+            ) : (
+              <MaterialIcons name="person" size={40} color={colors.muted} />
+            )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: colors.foreground }]}>
-              FitCheck User
+            <Text style={[styles.userName, { color: colors.foreground }]}>
+              {profile?.full_name || user?.user_metadata.full_name || "Guest User"}
             </Text>
-            <Text style={[styles.profileEmail, { color: colors.muted }]}>
-              Free Account
+            <Text style={[styles.userEmail, { color: colors.muted }]}>
+              {user?.email || "Sign in to sync your data"}
             </Text>
+            {isPro && (
+              <View style={[styles.proBadge, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.proBadgeText, { color: colors.background }]}>PRO</Text>
+              </View>
+            )}
           </View>
           <Pressable
             onPress={handleEditProfile}
-            style={({ pressed }) => [
-              styles.editButton,
-              { backgroundColor: colors.background, opacity: pressed ? 0.8 : 1 },
-            ]}
+            style={[styles.editButton, { borderColor: colors.border }]}
           >
-            <MaterialIcons name="edit" size={16} color={colors.foreground} />
+            <MaterialIcons name="edit" size={20} color={colors.foreground} />
           </Pressable>
         </View>
+
+        {/* Pro Banner */}
+        {!isPro && (
+          <Pressable
+            onPress={handleUpgradePro}
+            style={[styles.proBanner, { backgroundColor: colors.primary }]}
+          >
+            <View>
+              <Text style={[styles.proBannerTitle, { color: colors.background }]}>
+                Upgrade to Pro
+              </Text>
+              <Text style={[styles.proBannerSubtitle, { color: colors.background }]}>
+                Get unlimited items & AI styling
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={colors.background} />
+          </Pressable>
+        )}
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
@@ -232,7 +271,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="favorite" size={24} color="#E91E63" />
             <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Wishlist</Text>
           </Pressable>
-          
+
           <Pressable
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -246,7 +285,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="shuffle" size={24} color="#9C27B0" />
             <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Shuffle</Text>
           </Pressable>
-          
+
           <Pressable
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -261,32 +300,6 @@ export default function ProfileScreen() {
             <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>Packing</Text>
           </Pressable>
         </View>
-
-        {/* Pro Upgrade Banner */}
-        <Pressable
-          onPress={handleUpgradePro}
-          style={({ pressed }) => [
-            styles.proBanner,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.95 : 1 },
-          ]}
-        >
-          <View style={styles.proContent}>
-            <MaterialIcons name="workspace-premium" size={24} color={colors.background} />
-            <View style={styles.proText}>
-              <Text style={[styles.proTitle, { color: colors.background }]}>
-                Upgrade to Pro
-              </Text>
-              <Text style={[styles.proSubtitle, { color: colors.background }]}>
-                Unlimited items, Virtual Try-On & more
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.proPrice, { backgroundColor: colors.background }]}>
-            <Text style={[styles.proPriceText, { color: colors.foreground }]}>
-              $14.99/mo
-            </Text>
-          </View>
-        </Pressable>
 
         {/* Closet Stats */}
         <View style={styles.statsSection}>
@@ -309,6 +322,20 @@ export default function ProfileScreen() {
               <Text style={[styles.statLabel, { color: colors.muted }]}>Closet Value</Text>
             </View>
           </View>
+
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/analytics" as any);
+            }}
+            style={({ pressed }) => [
+              styles.insightsButton,
+              { backgroundColor: colors.primary + "10", borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }
+            ]}
+          >
+            <Text style={[styles.insightsButtonText, { color: colors.primary }]}>View Full Insights</Text>
+            <MaterialIcons name="auto-graph" size={18} color={colors.primary} />
+          </Pressable>
 
           {/* Category Breakdown */}
           {stats?.categoryBreakdown && Object.keys(stats.categoryBreakdown).length > 0 && (
@@ -377,16 +404,22 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Sign Out */}
+        {/* Sign Out Button */}
         <Pressable
           onPress={handleSignOut}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
-          ]}
+          style={[styles.signOutButton, { borderColor: colors.border }]}
         >
-          <MaterialIcons name="logout" size={20} color={colors.error} />
-          <Text style={[styles.signOutText, { color: colors.error }]}>Sign Out</Text>
+          <MaterialIcons
+            name={isAuthenticated ? "logout" : "login"}
+            size={20}
+            color={isAuthenticated ? colors.error || "#FF4B4B" : colors.primary}
+          />
+          <Text style={[
+            styles.signOutText,
+            { color: isAuthenticated ? colors.error || "#FF4B4B" : colors.primary }
+          ]}>
+            {isAuthenticated ? "Sign Out" : "Sign In"}
+          </Text>
         </Pressable>
 
         {/* Watermark */}
@@ -420,27 +453,35 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: "700",
+    overflow: "hidden",
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 16,
   },
-  profileName: {
-    fontSize: 18,
+  userName: {
+    fontSize: 20,
     fontWeight: "700",
   },
-  profileEmail: {
+  userEmail: {
     fontSize: 14,
     marginTop: 2,
+  },
+  proBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  proBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
   },
   editButton: {
     width: 36,
@@ -472,34 +513,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 20,
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 24,
   },
-  proContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  proText: {
-    gap: 2,
-  },
-  proTitle: {
-    fontSize: 16,
+  proBannerTitle: {
+    fontSize: 18,
     fontWeight: "700",
   },
-  proSubtitle: {
-    fontSize: 12,
+  proBannerSubtitle: {
+    fontSize: 14,
     opacity: 0.9,
-  },
-  proPrice: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  proPriceText: {
-    fontSize: 13,
-    fontWeight: "700",
+    marginTop: 2,
   },
   statsSection: {
     marginBottom: 20,
@@ -604,5 +629,20 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 8,
     opacity: 0.1,
+  },
+  insightsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 8,
+  },
+  insightsButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

@@ -72,8 +72,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
-    persistSession: isBrowser,
-    detectSessionInUrl: Platform.OS === "web" && isBrowser,
+    persistSession: true,
+    detectSessionInUrl: Platform.OS === "web",
   },
 });
 
@@ -160,7 +160,7 @@ export const supabaseHelpers = {
       .from("clothing_items")
       .select("*")
       .order("created_at", { ascending: false });
-    
+
     if (error) {
       console.error("Error fetching clothing items:", error);
       return [];
@@ -177,7 +177,7 @@ export const supabaseHelpers = {
       })
       .select()
       .single();
-    
+
     if (error) {
       console.error("Error saving clothing item:", error);
       return null;
@@ -190,7 +190,7 @@ export const supabaseHelpers = {
       .from("clothing_items")
       .delete()
       .eq("id", id);
-    
+
     if (error) {
       console.error("Error deleting clothing item:", error);
       return false;
@@ -204,7 +204,7 @@ export const supabaseHelpers = {
       .from("outfits")
       .select("*")
       .order("created_at", { ascending: false });
-    
+
     if (error) {
       console.error("Error fetching outfits:", error);
       return [];
@@ -218,12 +218,25 @@ export const supabaseHelpers = {
       .upsert(outfit)
       .select()
       .single();
-    
+
     if (error) {
       console.error("Error saving outfit:", error);
       return null;
     }
     return data;
+  },
+
+  async deleteOutfit(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from("outfits")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting outfit:", error);
+      return false;
+    }
+    return true;
   },
 
   // Wishlist
@@ -232,7 +245,7 @@ export const supabaseHelpers = {
       .from("wishlist_items")
       .select("*")
       .order("added_at", { ascending: false });
-    
+
     if (error) {
       console.error("Error fetching wishlist items:", error);
       return [];
@@ -246,7 +259,7 @@ export const supabaseHelpers = {
       .upsert(item)
       .select()
       .single();
-    
+
     if (error) {
       console.error("Error saving wishlist item:", error);
       return null;
@@ -259,7 +272,7 @@ export const supabaseHelpers = {
       .from("wishlist_items")
       .delete()
       .eq("id", id);
-    
+
     if (error) {
       console.error("Error deleting wishlist item:", error);
       return false;
@@ -273,7 +286,7 @@ export const supabaseHelpers = {
       .from("trips")
       .select("*")
       .order("start_date", { ascending: true });
-    
+
     if (error) {
       console.error("Error fetching trips:", error);
       return [];
@@ -287,7 +300,7 @@ export const supabaseHelpers = {
       .upsert(trip)
       .select()
       .single();
-    
+
     if (error) {
       console.error("Error saving trip:", error);
       return null;
@@ -300,7 +313,7 @@ export const supabaseHelpers = {
       .from("trips")
       .delete()
       .eq("id", id);
-    
+
     if (error) {
       console.error("Error deleting trip:", error);
       return false;
@@ -314,7 +327,7 @@ export const supabaseHelpers = {
       .from("outfit_logs")
       .select("*")
       .order("date", { ascending: false });
-    
+
     if (error) {
       console.error("Error fetching outfit logs:", error);
       return [];
@@ -328,7 +341,7 @@ export const supabaseHelpers = {
       .upsert(log)
       .select()
       .single();
-    
+
     if (error) {
       console.error("Error saving outfit log:", error);
       return null;
@@ -480,6 +493,26 @@ export const supabaseHelpers = {
       console.error("Error getting storage usage:", error);
       return null;
     }
+  },
+
+  // Helper to detect if a URI is local to the device
+  isLocalUri(uri: string): boolean {
+    if (!uri) return false;
+    return (
+      uri.startsWith("file://") ||
+      uri.startsWith("ph://") ||
+      uri.startsWith("assets-library://") ||
+      uri.startsWith("/") ||
+      uri.startsWith("content://") ||
+      // Also catch base64 strings which are effectively local data
+      uri.startsWith("data:")
+    );
+  },
+
+  // Robust check for a valid session
+  async getAuthenticatedUser() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
   },
 };
 

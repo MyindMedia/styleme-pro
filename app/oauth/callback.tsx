@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
+import { ActivityIndicator, Text, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -36,40 +36,68 @@ export default function OAuthCallback() {
       try {
         console.log("[OAuth] Processing callback...");
 
-        // Parse tokens from URL hash (Supabase implicit flow)
-        const hash = window.location.hash;
-        const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+        let accessToken: string | null = null;
+        let refreshToken: string | null = null;
+        let expiresIn: string | null = null;
+        let expiresAt: string | null = null;
 
-        // Check for errors first
-        const error = hashParams.get("error_description") || hashParams.get("error");
-        if (error) {
-          throw new Error(error);
+        if (Platform.OS === "web") {
+          // Parse tokens from URL hash (Supabase implicit flow)
+          const hash = window.location.hash;
+          const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+
+          // Check for errors first
+          const error = hashParams.get("error_description") || hashParams.get("error");
+          if (error) {
+            throw new Error(error);
+          }
+
+          accessToken = hashParams.get("access_token");
+          refreshToken = hashParams.get("refresh_token");
+          expiresIn = hashParams.get("expires_in");
+          expiresAt = hashParams.get("expires_at");
+        } else {
+          // On native, tokens might come in the URL fragment which Linking/Router can parse
+          // or they've already been handled by AuthContext's WebBrowser.
+          // Let's check for an existing session first.
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log("[OAuth] Native: Session already exists");
+            accessToken = session.access_token;
+          } else {
+            // If no session yet, we might still be waiting for AuthContext
+            console.log("[OAuth] Native: No session yet, waiting...");
+            // Give it a moment to sync if AuthContext is handling it
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const { data: { session: retrySession } } = await supabase.auth.getSession();
+            if (retrySession) {
+              accessToken = retrySession.access_token;
+            }
+          }
         }
-
-        const accessToken = hashParams.get("access_token");
-        const refreshToken = hashParams.get("refresh_token");
-        const expiresIn = hashParams.get("expires_in");
-        const expiresAt = hashParams.get("expires_at");
 
         console.log("[OAuth] Tokens present:", {
           hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
         });
 
         if (!accessToken) {
-          // Check if we already have a session (maybe auto-detected)
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log("[OAuth] Existing session found");
-            if (isMounted) {
-              setStatus("success");
-              redirectTimeout = setTimeout(() => {
-                if (isMounted) router.replace("/(tabs)");
-              }, 500);
+          // If we still don't have an access token on web, it's an error
+          if (Platform.OS === "web") {
+            throw new Error("No access token found in callback URL");
+          } else {
+            // On native, if we reach here and still no session, maybe we just redirected back
+            // without tokens (e.g. user closed browser). Check if isAuthenticated is actually true
+            // from the hook.
+            const { data: { session: finalCheck } } = await supabase.auth.getSession();
+            if (finalCheck) {
+              accessToken = finalCheck.access_token;
+            } else {
+              console.warn("[OAuth] Native: Reached callback but no session found.");
+              // Don't throw yet, just redirect to login
+              if (isMounted) router.replace("/auth/login");
+              return;
             }
-            return;
           }
-          throw new Error("No access token found in callback URL");
         }
 
         // Decode JWT to get user info (we trust it since it came from Supabase OAuth)
@@ -139,6 +167,7 @@ export default function OAuthCallback() {
         console.log("[OAuth] Session set successfully via Supabase!");
         if (isMounted) {
           setStatus("success");
+          // Dispatch signal to AuthContext if needed (though onAuthStateChange should handle it)
           redirectTimeout = setTimeout(() => {
             if (isMounted) router.replace("/(tabs)");
           }, 500);

@@ -21,6 +21,7 @@ import {
   ClothingItem,
   ClothingCategory,
   getClothingItems,
+  cleanupBrokenImages,
 } from "@/lib/storage";
 
 const ONBOARDING_KEY = "@fitcheck_onboarding_complete";
@@ -76,6 +77,20 @@ export default function ClosetScreen() {
     checkOnboarding();
   }, [profile, authLoading, router]);
 
+  // Perform background cleanup of broken images when authenticated
+  useEffect(() => {
+    if (profile?.id) {
+      const runCleanup = async () => {
+        const result = await cleanupBrokenImages();
+        if (result.fixed > 0) {
+          console.log(`[Closet] Fixed ${result.fixed} broken images`);
+          loadItems(); // Reload if any were fixed
+        }
+      };
+      runCleanup();
+    }
+  }, [profile?.id, loadItems]);
+
   useEffect(() => {
     loadItems();
   }, [loadItems]);
@@ -118,7 +133,7 @@ export default function ClosetScreen() {
           <Pressable style={[styles.iconButton, { backgroundColor: colors.surface }]}>
             <MaterialIcons name="search" size={20} color={colors.foreground} />
           </Pressable>
-          <Pressable 
+          <Pressable
             onPress={handleAddItem}
             style={[styles.iconButton, { backgroundColor: colors.primary }]}
           >
@@ -227,7 +242,7 @@ export default function ClosetScreen() {
           <MaterialIcons name="favorite-border" size={16} color={colors.foreground} />
         </Pressable>
       </View>
-      
+
       <View style={styles.itemInfo}>
         <Text style={[styles.itemBrand, { color: colors.foreground }]} numberOfLines={1}>
           {item.brand || "Unknown Brand"}

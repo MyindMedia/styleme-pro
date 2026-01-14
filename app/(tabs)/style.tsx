@@ -13,6 +13,7 @@ import {
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -24,6 +25,7 @@ import {
   saveOutfit,
   generateId,
 } from "@/lib/storage";
+import { trpc } from "@/lib/trpc";
 
 const MOODS = [
   { key: "old-money", label: "Old Money", icon: "workspace-premium", color: "#D4AF37" },
@@ -125,6 +127,11 @@ export default function StyleMeScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [weatherRecommendation, setWeatherRecommendation] = useState<any>(null);
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+
+  const suggestOutfitsMutation = trpc.clothing.suggestOutfits.useMutation();
+  const weatherRecommendationMutation = trpc.weather.getOutfitRecommendation.useMutation();
 
   useEffect(() => {
     const loadItems = async () => {
@@ -140,7 +147,7 @@ export default function StyleMeScreen() {
 
   const generateOutfits = useCallback(async () => {
     const items = getItemsForGeneration();
-    
+
     if (items.length < 2) {
       return;
     }
@@ -148,65 +155,58 @@ export default function StyleMeScreen() {
     setIsGenerating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Simulate AI generation delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setIsGenerating(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const tops = items.filter((i) => i.category === "tops");
-    const bottoms = items.filter((i) => i.category === "bottoms");
-    const shoes = items.filter((i) => i.category === "shoes");
-    const accessories = items.filter((i) => i.category === "accessories");
-    const outerwear = items.filter((i) => i.category === "outerwear");
-    const dresses = items.filter((i) => i.category === "dresses");
+    try {
+      const response = await suggestOutfitsMutation.mutateAsync({
+        itemDescription: `A complete outfit for a ${selectedMood} vibe`,
+        closetItems: items.map(item => ({
+          id: item.id,
+          name: item.name || `${item.color} ${item.type}`,
+          category: item.category,
+          type: item.type,
+          color: item.color,
+          style: item.style,
+        })),
+        mood: selectedMood,
+      });
 
-    const outfits: GeneratedOutfit[] = [];
+      if (response.success && response.suggestions) {
+        // The LLM response might be structured in different ways depending on the prompt
+        // Assuming it returns { outfits: [{ itemIds: string[] }] } or similar
+        const suggestions = response.suggestions as any;
+        const rawOutfits = suggestions.outfits || suggestions.suggestions || [];
 
-    // Generate 3 outfit combinations
-    for (let i = 0; i < 3; i++) {
-      const outfitItems: ClothingItem[] = [];
+        const mappedOutfits: GeneratedOutfit[] = rawOutfits.map((raw: any) => {
+          const outfitItems = (raw.itemIds || [])
+            .map((id: string) => items.find((item) => item.id === id))
+            .filter((item: ClothingItem | undefined): item is ClothingItem => !!item);
 
-      // Either pick a dress OR top+bottom combo
-      if (dresses.length > 0 && Math.random() > 0.7) {
-        outfitItems.push(dresses[Math.floor(Math.random() * dresses.length)]);
+          return {
+            id: generateId(),
+            items: outfitItems,
+            mood: selectedMood,
+          };
+        }).filter((o: GeneratedOutfit) => o.items.length >= 2);
+
+        if (mappedOutfits.length > 0) {
+          setGeneratedOutfits(mappedOutfits);
+          setHasGenerated(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          throw new Error("No valid outfits generated");
+        }
       } else {
-        // Pick a random top
-        if (tops.length > 0) {
-          outfitItems.push(tops[Math.floor(Math.random() * tops.length)]);
-        }
-
-        // Pick a random bottom
-        if (bottoms.length > 0) {
-          outfitItems.push(bottoms[Math.floor(Math.random() * bottoms.length)]);
-        }
+        throw new Error(response.error || "Failed to generate outfits");
       }
-
-      // Pick random shoes
-      if (shoes.length > 0) {
-        outfitItems.push(shoes[Math.floor(Math.random() * shoes.length)]);
-      }
-
-      // Sometimes add accessories or outerwear
-      if (accessories.length > 0 && Math.random() > 0.5) {
-        outfitItems.push(accessories[Math.floor(Math.random() * accessories.length)]);
-      }
-
-      if (outerwear.length > 0 && Math.random() > 0.6) {
-        outfitItems.push(outerwear[Math.floor(Math.random() * outerwear.length)]);
-      }
-
-      if (outfitItems.length >= 2) {
-        outfits.push({
-          id: generateId(),
-          items: outfitItems,
-          mood: selectedMood,
-        });
-      }
+    } catch (error) {
+      console.error("AI Generation error:", error);
+      Alert.alert("Generation Failed", "We couldn't generate outfits right now. Please try again.");
+    } finally {
+      setIsGenerating(false);
     }
-
-    setGeneratedOutfits(outfits);
-    setIsGenerating(false);
-    setHasGenerated(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [closetItems, selectedMood, isDemoMode]);
+  }, [closetItems, selectedMood, isDemoMode, suggestOutfitsMutation]);
 
   const handleSaveOutfit = async (outfit: GeneratedOutfit) => {
     if (isDemoMode) {
@@ -222,7 +222,7 @@ export default function StyleMeScreen() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     const newOutfit: Outfit = {
       id: outfit.id,
       name: `${MOODS.find((m) => m.key === outfit.mood)?.label || "Custom"} Look`,
@@ -250,6 +250,81 @@ export default function StyleMeScreen() {
     setIsDemoMode(false);
     setHasGenerated(false);
     setGeneratedOutfits([]);
+  };
+
+  const generateWeatherLook = async () => {
+    const items = isDemoMode ? DEMO_ITEMS : closetItems;
+    if (items.length < 1) {
+      Alert.alert("Need Items", "Add some items to your closet to get weather-based recommendations!");
+      return;
+    }
+
+    setIsWeatherLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      // 1. Get location
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Permission to access location was denied. We need it for weather recommendations.");
+        setIsWeatherLoading(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      // 2. Call tRPC
+      const response = await weatherRecommendationMutation.mutateAsync({
+        latitude,
+        longitude,
+        closetItems: items.map((item) => ({
+          id: item.id,
+          name: item.name || `${item.color} ${item.type}`,
+          category: item.category,
+          type: item.type,
+          color: item.color,
+          style: item.style,
+          seasons: item.seasons,
+          occasions: item.occasions,
+        })),
+        occasion: selectedMood,
+      });
+
+      if (response.success) {
+        setWeatherRecommendation(response);
+
+        // Map the suggested outfits to our local format if they provided specific items
+        const rawOutfits = response.outfitSuggestions || [];
+        const mappedOutfits: GeneratedOutfit[] = rawOutfits
+          .map((raw: any) => {
+            const outfitItems = (raw.itemIds || [])
+              .map((id: string) => items.find((item) => item.id === id))
+              .filter((item: ClothingItem | undefined): item is ClothingItem => !!item);
+
+            return {
+              id: Math.random().toString(36).substring(7),
+              items: outfitItems,
+              mood: selectedMood,
+            };
+          })
+          .filter((o: GeneratedOutfit) => o.items.length >= 2);
+
+        if (mappedOutfits.length > 0) {
+          setGeneratedOutfits(mappedOutfits);
+          setHasGenerated(true);
+        }
+
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        throw new Error(response.error || "Failed to get weather recommendation");
+      }
+    } catch (error) {
+      console.error("Weather Look error:", error);
+      Alert.alert("Weather Look Failed", "We couldn't get weather data right now. Please try again.");
+    } finally {
+      setIsWeatherLoading(false);
+    }
   };
 
   const renderMoodPill = ({ item }: { item: typeof MOODS[0] }) => {
@@ -288,7 +363,7 @@ export default function StyleMeScreen() {
 
   const renderOutfitCard = ({ item, index }: { item: GeneratedOutfit; index: number }) => {
     const moodInfo = MOODS.find((m) => m.key === item.mood);
-    
+
     return (
       <View style={[styles.outfitCard, { backgroundColor: colors.surface }]}>
         <View style={styles.outfitHeader}>
@@ -349,7 +424,7 @@ export default function StyleMeScreen() {
           ? "Add at least 2 items to your closet, or try demo mode to see how it works!"
           : "Select a mood and tap Generate to create AI-powered looks"}
       </Text>
-      
+
       {closetItems.length < 2 && (
         <View style={styles.emptyActions}>
           <Pressable
@@ -364,7 +439,7 @@ export default function StyleMeScreen() {
               Add Items
             </Text>
           </Pressable>
-          
+
           <Pressable
             onPress={handleTryDemo}
             style={({ pressed }) => [
@@ -446,11 +521,55 @@ export default function StyleMeScreen() {
           <>
             <MaterialIcons name="auto-awesome" size={20} color={colors.background} />
             <Text style={[styles.generateButtonText, { color: colors.background }]}>
-              Generate Looks {itemCount > 0 && `(${itemCount} items)`}
+              Generate AI Looks {itemCount > 0 && `(${itemCount} items)`}
             </Text>
           </>
         )}
       </Pressable>
+
+      <Pressable
+        onPress={generateWeatherLook}
+        disabled={isWeatherLoading || !canGenerate}
+        style={({ pressed }) => [
+          styles.weatherButton,
+          {
+            backgroundColor: colors.surface,
+            opacity: isWeatherLoading || !canGenerate ? 0.5 : pressed ? 0.9 : 1,
+            borderWidth: 1,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        {isWeatherLoading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <>
+            <View style={[styles.weatherIcon, { backgroundColor: colors.primary + "10" }]}>
+              <MaterialIcons name="wb-sunny" size={24} color={colors.primary} />
+            </View>
+            <View style={styles.weatherInfo}>
+              <Text style={[styles.weatherTitle, { color: colors.foreground }]}>
+                Weather Look
+              </Text>
+              <Text style={[styles.weatherSubtitle, { color: colors.muted }]}>
+                Outfit based on your local weather
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+          </>
+        )}
+      </Pressable>
+
+      {weatherRecommendation && weatherRecommendation.weather && (
+        <View style={styles.weatherSummary}>
+          <Text style={[styles.weatherSummaryText, { color: colors.foreground }]}>
+            <Text style={{ fontWeight: "700" }}>
+              {weatherRecommendation.weather.temperature}°F & {weatherRecommendation.weather.condition}.
+            </Text>{" "}
+            {weatherRecommendation.recommendation.summary}
+          </Text>
+        </View>
+      )}
 
       {hasGenerated && generatedOutfits.length > 0 ? (
         <FlatList
@@ -461,10 +580,7 @@ export default function StyleMeScreen() {
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.emptyContainer}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.emptyContainer} showsVerticalScrollIndicator={false}>
           {renderEmptyState()}
         </ScrollView>
       )}
@@ -581,6 +697,15 @@ const styles = StyleSheet.create({
   generateButtonText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  weatherSummary: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  weatherSummaryText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: "italic",
   },
   outfitList: {
     padding: 16,

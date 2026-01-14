@@ -133,21 +133,21 @@ const clothingRecognitionSchema = {
         properties: {
           name: { type: "string", description: "Name/title of the clothing item" },
           brand: { type: "string", description: "Brand name if identifiable, or 'Unknown'" },
-          category: { 
-            type: "string", 
+          category: {
+            type: "string",
             enum: ["tops", "bottoms", "shoes", "accessories", "outerwear", "dresses", "swimwear"],
             description: "Main category of the item"
           },
-          type: { 
-            type: "string", 
+          type: {
+            type: "string",
             description: "Specific type (e.g., t-shirt, jeans, sneakers, blazer)"
           },
           color: { type: "string", description: "Primary color of the item" },
           secondaryColor: { type: "string", description: "Secondary color if applicable" },
           pattern: { type: "string", description: "Pattern type (solid, striped, plaid, floral, etc.)" },
           material: { type: "string", description: "Estimated material (cotton, denim, leather, etc.)" },
-          style: { 
-            type: "string", 
+          style: {
+            type: "string",
             enum: ["casual", "business", "athletic", "formal", "streetwear", "loungewear"],
             description: "Style category"
           },
@@ -351,7 +351,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         try {
           const imageUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
-          
+
           const result = await invokeLLM({
             messages: [
               {
@@ -393,13 +393,13 @@ Provide search suggestions that would help find this exact item online.`
           if (typeof content === "string") {
             return JSON.parse(content);
           }
-          
+
           return { success: false, error: "Failed to parse response" };
         } catch (error) {
           console.error("Image recognition error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Recognition failed" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Recognition failed"
           };
         }
       }),
@@ -414,7 +414,7 @@ Provide search suggestions that would help find this exact item online.`
       .mutation(async ({ input }) => {
         try {
           const imageUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
-          
+
           // First, analyze the image to get search terms
           const analysisResult = await invokeLLM({
             messages: [
@@ -453,7 +453,7 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
 
           let searchTerms = "";
           let identifiedItem: any = {};
-          
+
           const analysisContent = analysisResult.choices[0]?.message?.content;
           if (typeof analysisContent === "string") {
             try {
@@ -498,22 +498,31 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
               price: "View Prices",
               store: "eBay",
               url: `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}`,
-              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/EBay_logo.svg/512px-EBay_logo.svg.png",
+              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/EBay_logo.svg/800px-EBay_logo.svg.png",
               similarity: 90
             },
             {
-              name: `Search Images for "${searchQuery}"`,
-              brand: brand || "Google Images",
-              price: "View Matches",
-              store: "Google Images",
-              url: `https://www.google.com/search?tbm=isch&q=${encodedQuery}`,
-              imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Images_2015_logo.svg/640px-Google_Images_2015_logo.svg.png",
+              name: `Search on Grailed`,
+              brand: brand || "Grailed",
+              price: "Luxury Resale",
+              store: "Grailed",
+              url: `https://www.grailed.com/shop?search=${encodedQuery}`,
+              imageUrl: "https://pbs.twimg.com/profile_images/1422204618778333185/vV_8_q6m_400x400.jpg",
               similarity: 85
+            },
+            {
+              name: `Search on Farfetch`,
+              brand: brand || "Farfetch",
+              price: "Luxury",
+              store: "Farfetch",
+              url: `https://www.farfetch.com/shopping/men/search/items.aspx?q=${encodedQuery}`,
+              imageUrl: "https://yt3.googleusercontent.com/ytc/ALm5wu1Y6wF5U5n7U5_m5z_L7g_K_Ym9v6_w4_x5_w=s900-c-k-c0x00ffffff-no-rj",
+              similarity: 80
             }
           ];
 
-          return { 
-            success: true, 
+          return {
+            success: true,
             matches: realSearchMatches,
             searchQuery,
             identifiedItem,
@@ -521,8 +530,8 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
           };
         } catch (error) {
           console.error("Reverse image search error:", error);
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: error instanceof Error ? error.message : "Search failed",
             matches: []
           };
@@ -540,9 +549,15 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
           const urlObj = new URL(input.productUrl);
           const domain = urlObj.hostname.toLowerCase();
 
-          // Check for known problematic domains
-          const protectedSites = ["zara.com", "mango.com", "pull-bear.com", "bershka.com", "stradivarius.com"];
-          const isProtectedSite = protectedSites.some(site => domain.includes(site));
+          // Check for known problematic domains (Fast fashion & Luxury brands often have strict bot protection)
+          const protectedSites = [
+            "zara.com", "mango.com", "pull-bear.com", "bershka.com", "stradivarius.com",
+            "gucci.com", "louisvuitton.com", "chanel.com", "hermes.com", "prada.com", "dior.com",
+            "nike.com", "adidas.com", "hm.com"
+          ];
+          const isProtectedSite = protectedSites.some(site =>
+            domain === site || domain.endsWith("." + site)
+          );
 
           if (isProtectedSite) {
             // These sites have aggressive bot protection
@@ -738,13 +753,13 @@ Suggest 3 complete outfits using items from the closet.`
           if (typeof content === "string") {
             return { success: true, suggestions: JSON.parse(content) };
           }
-          
+
           return { success: false, error: "Failed to generate suggestions" };
         } catch (error) {
           console.error("Outfit suggestion error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to suggest outfits" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to suggest outfits"
           };
         }
       }),
@@ -773,15 +788,15 @@ Suggest 3 complete outfits using items from the closet.`
         try {
           // Fetch weather data from Open-Meteo (free, no API key required)
           const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${input.latitude}&longitude=${input.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
-          
+
           const weatherResponse = await fetch(weatherUrl);
           if (!weatherResponse.ok) {
             throw new Error(`Weather API error: ${weatherResponse.status}`);
           }
-          
+
           const weatherData = await weatherResponse.json();
           const current = weatherData.current;
-          
+
           // Map weather codes to conditions
           const weatherCodeMap: Record<number, string> = {
             0: "Clear sky",
@@ -809,25 +824,25 @@ Suggest 3 complete outfits using items from the closet.`
             96: "Thunderstorm with slight hail",
             99: "Thunderstorm with heavy hail",
           };
-          
+
           const weatherCondition = weatherCodeMap[current.weather_code] || "Unknown";
           const temperature = current.temperature_2m;
           const feelsLike = current.apparent_temperature;
           const humidity = current.relative_humidity_2m;
           const windSpeed = current.wind_speed_10m;
-          
+
           // Determine weather icon
           const isRainy = [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(current.weather_code);
           const isSnowy = [71, 73, 75, 77, 85, 86].includes(current.weather_code);
           const isCloudy = [2, 3, 45, 48].includes(current.weather_code);
           const isStormy = [95, 96, 99].includes(current.weather_code);
-          
+
           let icon = "sunny";
           if (isStormy) icon = "thunderstorm";
           else if (isRainy) icon = "rainy";
           else if (isSnowy) icon = "snowy";
           else if (isCloudy) icon = "cloudy";
-          
+
           // Use LLM to generate outfit recommendations based on weather and closet
           const result = await invokeLLM({
             messages: [
@@ -887,10 +902,10 @@ Provide:
               }
             };
           }
-          
+
           // Return basic weather data even if LLM fails
-          return { 
-            success: true, 
+          return {
+            success: true,
             weather: {
               temperature,
               feelsLike,
@@ -901,9 +916,9 @@ Provide:
               code: current.weather_code
             },
             recommendation: {
-              summary: temperature < 50 
+              summary: temperature < 50
                 ? "It's cold today. Layer up with warm clothing."
-                : temperature > 80 
+                : temperature > 80
                   ? "It's hot today. Wear light, breathable fabrics."
                   : "Moderate temperature. Dress comfortably.",
               layers: temperature < 60 ? "Consider adding a jacket or sweater" : "Light layers should be fine",
@@ -916,9 +931,9 @@ Provide:
           };
         } catch (error) {
           console.error("Weather outfit recommendation error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to get weather recommendations" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to get weather recommendations"
           };
         }
       }),
@@ -933,14 +948,14 @@ Provide:
       .query(async ({ input }) => {
         try {
           const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${input.latitude}&longitude=${input.longitude}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&temperature_unit=fahrenheit&timezone=auto&forecast_days=${input.days}`;
-          
+
           const response = await fetch(weatherUrl);
           if (!response.ok) {
             throw new Error(`Weather API error: ${response.status}`);
           }
-          
+
           const data = await response.json();
-          
+
           return {
             success: true,
             forecast: data.daily,
@@ -952,9 +967,9 @@ Provide:
           };
         } catch (error) {
           console.error("Weather forecast error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to get forecast" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to get forecast"
           };
         }
       }),
@@ -983,7 +998,7 @@ Provide:
           }
 
           const html = fetchResult.html;
-          
+
           // Use LLM to extract measurements from size charts and product details
           const result = await invokeLLM({
             messages: [
@@ -1031,13 +1046,13 @@ HTML content:\n${html.substring(0, 60000)}`
               modelInfo: parsed.modelInfo
             };
           }
-          
+
           return { success: false, error: "Failed to extract measurements" };
         } catch (error) {
           console.error("Measurement extraction error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to extract measurements" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to extract measurements"
           };
         }
       }),
@@ -1058,7 +1073,7 @@ HTML content:\n${html.substring(0, 60000)}`
       .mutation(async ({ input }) => {
         try {
           const imageUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
-          
+
           const result = await invokeLLM({
             messages: [
               {
@@ -1099,13 +1114,13 @@ Provide proportional data that can be used for accurate virtual try-on rendering
           if (typeof content === "string") {
             return { success: true, analysis: JSON.parse(content) };
           }
-          
+
           return { success: false, error: "Failed to analyze garment" };
         } catch (error) {
           console.error("Garment analysis error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to analyze garment" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to analyze garment"
           };
         }
       }),
@@ -1138,7 +1153,7 @@ Provide proportional data that can be used for accurate virtual try-on rendering
         try {
           const userImageUrl = `data:${input.mimeType};base64,${input.userAvatarBase64}`;
           const garmentImageUrl = `data:${input.mimeType};base64,${input.garmentImageBase64}`;
-          
+
           // Use LLM to generate try-on analysis and fit prediction
           const result = await invokeLLM({
             messages: [
@@ -1213,13 +1228,13 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
               overallFit: analysis.overallFit || "unknown"
             };
           }
-          
+
           return { success: false, error: "Failed to generate try-on analysis" };
         } catch (error) {
           console.error("Try-on generation error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to generate try-on" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to generate try-on"
           };
         }
       }),
@@ -1251,10 +1266,10 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
           const scores: Record<string, number> = {};
           const issues: string[] = [];
           const recommendations: string[] = [];
-          
+
           const gm = input.garmentMeasurements;
           const um = input.userMeasurements;
-          
+
           // Chest fit calculation
           if (gm.chest && um.chest) {
             const diff = gm.chest - um.chest;
@@ -1268,7 +1283,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
               scores.chest = 100 - Math.abs(diff - 3) * 10; // Ideal is 3" ease
             }
           }
-          
+
           // Waist fit calculation
           if (gm.waist && um.waist) {
             const diff = gm.waist - um.waist;
@@ -1282,7 +1297,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
               scores.waist = 100 - Math.abs(diff - 2) * 10;
             }
           }
-          
+
           // Shoulder fit calculation
           if (gm.shoulderWidth && um.shoulderWidth) {
             const diff = gm.shoulderWidth - um.shoulderWidth;
@@ -1297,7 +1312,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
               scores.shoulders = 100;
             }
           }
-          
+
           // Inseam fit calculation (for bottoms)
           if (gm.inseam && um.inseam && ["bottoms", "jeans", "pants"].includes(input.category.toLowerCase())) {
             const diff = gm.inseam - um.inseam;
@@ -1311,13 +1326,13 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
               scores.inseam = 100;
             }
           }
-          
+
           // Calculate overall score
           const scoreValues = Object.values(scores);
-          const overallScore = scoreValues.length > 0 
+          const overallScore = scoreValues.length > 0
             ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
             : 75; // Default if no measurements to compare
-          
+
           // Determine overall fit
           let overallFit: string;
           if (overallScore >= 90) overallFit = "perfect";
@@ -1325,7 +1340,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
           else if (overallScore >= 60) overallFit = "acceptable";
           else if (overallScore >= 40) overallFit = "tight";
           else overallFit = "poor";
-          
+
           return {
             success: true,
             overallScore,
@@ -1336,9 +1351,9 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
           };
         } catch (error) {
           console.error("Fit calculation error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to calculate fit" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to calculate fit"
           };
         }
       }),
@@ -1357,17 +1372,17 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
       .mutation(async ({ input }) => {
         try {
           const apiKey = ENV.removeBgApiKey;
-          
+
           if (!apiKey) {
-            return { 
-              success: false, 
-              error: "Remove.bg API key not configured. Please add REMOVE_BG_API_KEY to environment variables." 
+            return {
+              success: false,
+              error: "Remove.bg API key not configured. Please add REMOVE_BG_API_KEY to environment variables."
             };
           }
-          
+
           // Convert base64 to buffer for remove.bg API
           const imageBuffer = Buffer.from(input.imageBase64, "base64");
-          
+
           // Create form data for remove.bg API
           const formData = new FormData();
           formData.append("image_file", new Blob([imageBuffer], { type: input.mimeType }), "image.jpg");
@@ -1375,7 +1390,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
           formData.append("type", input.type);
           formData.append("format", "png"); // PNG for transparency
           formData.append("bg_color", ""); // Transparent background
-          
+
           // Call remove.bg API
           const response = await fetch("https://api.remove.bg/v1.0/removebg", {
             method: "POST",
@@ -1384,30 +1399,30 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
             },
             body: formData,
           });
-          
+
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             const errorMessage = errorData.errors?.[0]?.title || `API error: ${response.status}`;
-            
+
             // Check for specific error codes
             if (response.status === 402) {
-              return { 
-                success: false, 
-                error: "Remove.bg API credits exhausted. Please add more credits or upgrade your plan." 
+              return {
+                success: false,
+                error: "Remove.bg API credits exhausted. Please add more credits or upgrade your plan."
               };
             }
-            
+
             return { success: false, error: errorMessage };
           }
-          
+
           // Get the processed image as buffer
           const resultBuffer = await response.arrayBuffer();
           const processedBase64 = Buffer.from(resultBuffer).toString("base64");
-          
+
           // Get credits info from response headers
           const creditsRemaining = response.headers.get("X-Credits-Remaining");
           const creditsUsed = response.headers.get("X-Credits-Charged");
-          
+
           return {
             success: true,
             processedImageBase64: processedBase64,
@@ -1417,9 +1432,9 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
           };
         } catch (error) {
           console.error("Background removal error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to remove background" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to remove background"
           };
         }
       }),
@@ -1436,42 +1451,42 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
       }))
       .mutation(async ({ input }) => {
         const apiKey = ENV.removeBgApiKey;
-        
+
         if (!apiKey) {
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: "Remove.bg API key not configured",
-            results: [] 
+            results: []
           };
         }
-        
+
         const results: Array<{
           id: string;
           success: boolean;
           processedImageBase64?: string;
           error?: string;
         }> = [];
-        
+
         let totalCreditsUsed = 0;
         let creditsRemaining: number | undefined;
-        
+
         // Process images sequentially to avoid rate limits
         for (const image of input.images) {
           try {
             const imageBuffer = Buffer.from(image.imageBase64, "base64");
-            
+
             const formData = new FormData();
             formData.append("image_file", new Blob([imageBuffer], { type: image.mimeType }), "image.jpg");
             formData.append("size", input.size);
             formData.append("type", "product");
             formData.append("format", "png");
-            
+
             const response = await fetch("https://api.remove.bg/v1.0/removebg", {
               method: "POST",
               headers: { "X-Api-Key": apiKey },
               body: formData,
             });
-            
+
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({}));
               results.push({
@@ -1479,29 +1494,29 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
                 success: false,
                 error: errorData.errors?.[0]?.title || `Failed: ${response.status}`,
               });
-              
+
               // Stop if out of credits
               if (response.status === 402) {
                 break;
               }
               continue;
             }
-            
+
             const resultBuffer = await response.arrayBuffer();
             const processedBase64 = Buffer.from(resultBuffer).toString("base64");
-            
+
             const credits = response.headers.get("X-Credits-Charged");
             if (credits) totalCreditsUsed += parseFloat(credits);
-            
+
             const remaining = response.headers.get("X-Credits-Remaining");
             if (remaining) creditsRemaining = parseFloat(remaining);
-            
+
             results.push({
               id: image.id,
               success: true,
               processedImageBase64: processedBase64,
             });
-            
+
             // Small delay between requests to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 200));
           } catch (error) {
@@ -1512,7 +1527,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
             });
           }
         }
-        
+
         return {
           success: results.some(r => r.success),
           results,
@@ -1528,22 +1543,22 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
       .query(async () => {
         try {
           const apiKey = ENV.removeBgApiKey;
-          
+
           if (!apiKey) {
             return { success: false, error: "API key not configured" };
           }
-          
+
           const response = await fetch("https://api.remove.bg/v1.0/account", {
             headers: { "X-Api-Key": apiKey },
           });
-          
+
           if (!response.ok) {
             return { success: false, error: `API error: ${response.status}` };
           }
-          
+
           const data = await response.json();
           const credits = data.data?.attributes?.credits;
-          
+
           return {
             success: true,
             credits: {
@@ -1555,9 +1570,9 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
             freeApiCalls: data.data?.attributes?.api?.free_calls || 0,
           };
         } catch (error) {
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to check credits" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to check credits"
           };
         }
       }),
@@ -1577,7 +1592,7 @@ Provide a detailed fit analysis maintaining the garment's original proportions.`
       .mutation(async ({ input }) => {
         try {
           const imageUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
-          
+
           // Use LLM to analyze image quality and suggest enhancements
           const result = await invokeLLM({
             messages: [
@@ -1626,13 +1641,13 @@ Focus on making the clothing item look its best while maintaining color accuracy
               enhancedImageBase64: input.imageBase64,
             };
           }
-          
+
           return { success: false, error: "Failed to analyze image" };
         } catch (error) {
           console.error("Image enhancement error:", error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Failed to enhance image" 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to enhance image"
           };
         }
       }),

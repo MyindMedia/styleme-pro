@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import { syncLocalStorageToCloud } from "@/lib/storage";
 
 // User profile type
 export interface UserProfile {
@@ -25,12 +28,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isPro: boolean; // Mocked Pro status
-  
+
   // Auth methods
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: "google" | "apple" | "facebook") => Promise<{ error: AuthError | null }>;
-  setSessionManually: (accessToken: string, refreshToken: string) => Promise<{ error: AuthError | null }>; 
+  setSessionManually: (accessToken: string, refreshToken: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
@@ -147,6 +150,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isMounted) {
             setProfile(userProfile);
           }
+          // Sync local storage to cloud
+          if (event === "SIGNED_IN") {
+            syncLocalStorageToCloud().then(result => {
+              if (result.success && result.itemsCount > 0) {
+                console.log(`[Auth] Synced ${result.itemsCount} local items to cloud`);
+              }
+            });
+          }
         } else {
           setProfile(null);
         }
@@ -203,23 +214,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign in with OAuth provider
   const signInWithOAuth = async (provider: "google" | "apple" | "facebook") => {
     try {
-      const redirectTo = typeof window !== "undefined"
-        ? `${window.location.origin}/oauth/callback`
-        : "styleme://oauth/callback";
-      
-      console.log(`[Auth] Initiating OAuth with ${provider}, redirecting to: ${redirectTo}`);
+      if (Platform.OS === "web") {
+        const redirectTo = `${window.location.origin}/oauth/callback`;
+        console.log(`[Auth] Initiating web OAuth with ${provider}, redirecting to: ${redirectTo}`);
 
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo,
-          skipBrowserRedirect: false, // Ensure browser handles the redirect
-        },
-      });
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+            skipBrowserRedirect: false,
+          },
+        });
+        return { error };
+      } else {
+        // Native platform handling
+        setIsLoading(true);
+        const redirectTo = Linking.createURL("/oauth/callback");
+        console.log(`[Auth] Initiating native OAuth with ${provider}, redirecting to: ${redirectTo}`);
 
-      return { error };
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true, // Handle redirect manually
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.url) {
+          const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+          if (result.type === "success" && result.url) {
+            // Extract tokens from URL fragment
+            const fragment = result.url.split("#")[1];
+            if (!fragment) {
+              const query = result.url.split("?")[1];
+              if (query) {
+                const params = new URLSearchParams(query);
+                const accessToken = params.get("access_token");
+                const refreshToken = params.get("refresh_token");
+                if (accessToken && refreshToken) {
+                  return await setSessionManually(accessToken, refreshToken);
+                }
+              }
+              throw new Error("No tokens found in redirect URL");
+            }
+
+            const params = new URLSearchParams(fragment);
+            const accessToken = params.get("access_token");
+            const refreshToken = params.get("refresh_token");
+
+            if (accessToken && refreshToken) {
+              return await setSessionManually(accessToken, refreshToken);
+            }
+          }
+        }
+
+        return { error: null };
+      }
     } catch (error) {
+      console.error("[Auth] OAuth error:", error);
+      setIsLoading(false);
       return { error: error as AuthError };
+    } finally {
+      // In case of success, setSessionManually will handle setIsLoading(false)
+      // But we check here as a safety measure
     }
   };
 
@@ -244,6 +304,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Fetch profile immediately
         const userProfile = await fetchProfile(data.session.user);
         setProfile(userProfile);
+
+        // Sync local storage to cloud
+        syncLocalStorageToCloud().then(result => {
+          if (result.success && result.itemsCount > 0) {
+            console.log(`[Auth] Synced ${result.itemsCount} local items to cloud (manual)`);
+          }
+        });
+
         // Force loading to false immediately
         setIsLoading(false);
       } else {

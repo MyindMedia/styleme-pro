@@ -129,24 +129,24 @@ export default function AddItemScreen() {
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ["images"],
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-        })
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
       : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-        });
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       setImageUri(uri);
       setOriginalImageUri(uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
+
       // Start AI recognition and background removal
       analyzeImage(uri);
     }
@@ -173,6 +173,7 @@ export default function AddItemScreen() {
           encoding: "base64",
         });
         setImageUri(tempPath);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error("Background removal failed:", error);
@@ -233,7 +234,7 @@ export default function AddItemScreen() {
     try {
       const result = await recognizeFromUrl.mutateAsync({
         productUrl: productUrl.trim(),
-      });
+      }) as any;
 
       if (result.success && result.item) {
         // Apply recognized values
@@ -303,7 +304,7 @@ export default function AddItemScreen() {
         imageBase64: base64,
         mimeType: "image/jpeg",
         itemDescription,
-      });
+      }) as any;
 
       if (result.success && result.matches && result.matches.length > 0) {
         setSearchResults(result.matches);
@@ -333,7 +334,7 @@ export default function AddItemScreen() {
       outerwear: "outerwear",
       dresses: "dresses",
     };
-    
+
     if (item.category && categoryMap[item.category.toLowerCase()]) {
       setCategory(categoryMap[item.category.toLowerCase()]);
     }
@@ -624,6 +625,7 @@ export default function AddItemScreen() {
               <Pressable
                 key={index}
                 onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   if (result.url) {
                     Alert.alert(
                       result.name || "Product",
@@ -633,6 +635,13 @@ export default function AddItemScreen() {
                         {
                           text: "Open Link",
                           onPress: () => Linking.openURL(result.url)
+                        },
+                        {
+                          text: "Import Details",
+                          onPress: () => {
+                            setProductUrl(result.url);
+                            analyzeUrl();
+                          }
                         },
                         // Only show "Use Price" if it looks like a real price (contains numbers)
                         ...(result.price && /\d/.test(result.price) ? [{
@@ -797,17 +806,17 @@ export default function AddItemScreen() {
               <MaterialIcons name="close" size={16} color="#fff" />
             </Pressable>
           </View>
-          
+
           {originalImageUri && (
             <View style={styles.bgRemovalToggle}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[styles.bgRemovalText, { color: colors.foreground }]}>Remove Background</Text>
-                    {!isPro && (
-                        <View style={{ backgroundColor: "#FFD700", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "black" }}>PRO</Text>
-                        </View>
-                    )}
+                  <Text style={[styles.bgRemovalText, { color: colors.foreground }]}>Remove Background</Text>
+                  {!isPro && (
+                    <View style={{ backgroundColor: "#FFD700", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "bold", color: "black" }}>PRO</Text>
+                    </View>
+                  )}
                 </View>
                 {!isPro && <Text style={{ fontSize: 11, color: colors.muted }}>Upgrade to enable AI removal</Text>}
               </View>
@@ -1062,10 +1071,10 @@ export default function AddItemScreen() {
           }}
           style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.6 : 1 }]}
         >
-          <MaterialIcons 
-            name={step === "input" || step === "analyzing" ? "close" : "arrow-back"} 
-            size={24} 
-            color={colors.foreground} 
+          <MaterialIcons
+            name={step === "input" || step === "analyzing" ? "close" : "arrow-back"}
+            size={24}
+            color={colors.foreground}
           />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>
@@ -1589,6 +1598,33 @@ const styles = StyleSheet.create({
   },
   similarityText: {
     fontSize: 11,
+    fontWeight: "500",
+  },
+  imageWrapper: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+    position: "relative",
+  },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  bgRemovalToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  bgRemovalText: {
+    fontSize: 15,
     fontWeight: "500",
   },
 });

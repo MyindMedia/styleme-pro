@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase, supabaseHelpers, DbClothingItem, DbOutfit, DbWishlistItem, DbTrip, DbOutfitLog } from "./supabase";
 
 // ============ Types ============
 
@@ -340,6 +341,140 @@ const STORAGE_KEYS = {
   WISHLIST: "styleme_wishlist",
 };
 
+// ============ Mapping Helpers ============
+
+function mapToDbClothingItem(item: ClothingItem, userId?: string): Omit<DbClothingItem, "created_at" | "updated_at"> {
+  return {
+    id: item.id.includes("-") && item.id.split("-").length > 2 ? item.id : undefined as any, // Only use if it's a UUID, otherwise let DB generate
+    user_id: userId,
+    image_uri: item.imageUri,
+    category: item.category,
+    type: item.type,
+    color: item.color,
+    brand: item.brand,
+    purchase_price: item.purchasePrice,
+    occasions: item.occasions,
+    seasons: item.seasons,
+    wear_count: item.wearCount,
+    last_worn: item.lastWornAt,
+    is_favorite: !!item.isFavorite,
+    notes: item.tags.join(", "),
+  };
+}
+
+function mapFromDbClothingItem(dbItem: DbClothingItem): ClothingItem {
+  return {
+    id: dbItem.id,
+    imageUri: dbItem.image_uri,
+    category: dbItem.category as any,
+    type: dbItem.type,
+    color: dbItem.color,
+    brand: dbItem.brand || "Unknown",
+    purchasePrice: dbItem.purchase_price,
+    tags: dbItem.notes ? dbItem.notes.split(",").map(t => t.trim()) : [],
+    occasions: dbItem.occasions as any[],
+    seasons: dbItem.seasons as any[],
+    wearCount: dbItem.wear_count,
+    lastWornAt: dbItem.last_worn,
+    isFavorite: dbItem.is_favorite,
+    createdAt: dbItem.created_at,
+  };
+}
+
+function mapToDbWishlistItem(item: WishlistItem, userId: string): DbWishlistItem {
+  return {
+    id: item.id,
+    user_id: userId,
+    image_uri: item.imageUri,
+    name: item.name,
+    brand: item.brand,
+    price: item.price,
+    link: item.link,
+    category: item.category,
+    type: item.type,
+    color: item.color,
+    occasions: item.occasions,
+    seasons: item.seasons,
+    notes: item.notes,
+    is_priority: item.isPriority,
+    added_at: item.addedAt,
+  };
+}
+
+function mapFromDbWishlistItem(dbItem: DbWishlistItem): WishlistItem {
+  return {
+    id: dbItem.id,
+    imageUri: dbItem.image_uri,
+    name: dbItem.name,
+    brand: dbItem.brand || "",
+    price: dbItem.price,
+    link: dbItem.link,
+    category: dbItem.category as any,
+    type: dbItem.type,
+    color: dbItem.color,
+    occasions: dbItem.occasions as any[],
+    seasons: dbItem.seasons as any[],
+    notes: dbItem.notes,
+    isPriority: dbItem.is_priority,
+    addedAt: dbItem.added_at,
+  };
+}
+
+function mapToDbTrip(trip: Trip, userId: string, packingList?: PackingList): DbTrip {
+  return {
+    id: trip.id,
+    user_id: userId,
+    name: trip.name,
+    destination: trip.destination,
+    start_date: trip.startDate,
+    end_date: trip.endDate,
+    climate: trip.climate,
+    occasions: trip.activities,
+    packing_list: packingList ? packingList.items.map(i => i.name) : [],
+    is_packed: false,
+    created_at: trip.createdAt,
+  };
+}
+
+function mapFromDbTrip(dbItem: DbTrip): Trip {
+  return {
+    id: dbItem.id,
+    name: dbItem.name,
+    destination: dbItem.destination,
+    startDate: dbItem.start_date,
+    endDate: dbItem.end_date,
+    tripType: "vacation", // Default as DB doesn't have trip_type
+    climate: dbItem.climate as any,
+    activities: dbItem.occasions || [],
+    createdAt: dbItem.created_at,
+  };
+}
+
+function mapToDbOutfitLog(log: WearLog, userId: string): DbOutfitLog {
+  return {
+    id: log.id,
+    user_id: userId,
+    date: log.date,
+    outfit_id: log.outfitId,
+    item_ids: log.itemIds,
+    notes: log.notes,
+    photo_uri: log.imageUri,
+    created_at: new Date().toISOString(),
+  };
+}
+
+function mapFromDbOutfitLog(dbItem: DbOutfitLog): WearLog {
+  return {
+    id: dbItem.id,
+    date: dbItem.date,
+    itemIds: dbItem.item_ids,
+    outfitId: dbItem.outfit_id,
+    imageUri: dbItem.photo_uri,
+    notes: dbItem.notes,
+    sharedToCommunity: false,
+  };
+}
+
 // ============ Generic Storage Helpers ============
 
 async function getStorageItem<T>(key: string, defaultValue: T): Promise<T> {
@@ -360,27 +495,76 @@ async function setStorageItem<T>(key: string, value: T): Promise<void> {
   }
 }
 
+// ============ Sync Helpers ============
+
+/**
+ * Checks if a URI is local and uploads it to Supabase if authenticated.
+ * Returns the remote URL or the original URI if upload fails or is not needed.
+ */
+async function uploadIfLocal(
+  uri: string | undefined,
+  userId: string,
+  folder: "clothing" | "outfits" | "profile" = "clothing"
+): Promise<string> {
+  if (!uri || !supabaseHelpers.isLocalUri(uri)) {
+    return uri || "";
+  }
+
+  console.log(`[Storage] Uploading local image to ${folder}...`);
+  const result = await supabaseHelpers.uploadUserImage(uri, userId, folder);
+  if (result) {
+    console.log(`[Storage] Upload successful: ${result.url}`);
+    return result.url;
+  }
+
+  console.warn(`[Storage] Failed to upload local image: ${uri}`);
+  return uri;
+}
+
 // ============ Clothing Items ============
 
 export async function getClothingItems(): Promise<ClothingItem[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbItems = await supabaseHelpers.getClothingItems();
+    return dbItems.map(mapFromDbClothingItem);
+  }
+
   return getStorageItem(STORAGE_KEYS.ITEMS, []);
 }
 
 export async function saveClothingItem(item: ClothingItem): Promise<void> {
-  const items = await getClothingItems();
-  const existingIndex = items.findIndex((i) => i.id === item.id);
-  if (existingIndex >= 0) {
-    items[existingIndex] = item;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    // Ensure image is uploaded if it's local
+    const remoteUri = await uploadIfLocal(item.imageUri, session.user.id, "clothing");
+    const itemToSave = { ...item, imageUri: remoteUri };
+
+    await supabaseHelpers.saveClothingItem(mapToDbClothingItem(itemToSave, session.user.id) as any);
   } else {
-    items.unshift(item);
+    const items = await getClothingItems();
+    const existingIndex = items.findIndex((i) => i.id === item.id);
+    if (existingIndex >= 0) {
+      items[existingIndex] = item;
+    } else {
+      items.unshift(item);
+    }
+    await setStorageItem(STORAGE_KEYS.ITEMS, items);
   }
-  await setStorageItem(STORAGE_KEYS.ITEMS, items);
 }
 
 export async function deleteClothingItem(id: string): Promise<void> {
-  const items = await getClothingItems();
-  const filtered = items.filter((i) => i.id !== id);
-  await setStorageItem(STORAGE_KEYS.ITEMS, filtered);
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    await supabaseHelpers.deleteClothingItem(id);
+  } else {
+    const items = await getClothingItems();
+    const filtered = items.filter((i) => i.id !== id);
+    await setStorageItem(STORAGE_KEYS.ITEMS, filtered);
+  }
 }
 
 export async function updateItemWearCount(id: string): Promise<void> {
@@ -414,18 +598,48 @@ export async function getItemsByFilter(filters: {
 // ============ Outfits ============
 
 export async function getOutfits(): Promise<Outfit[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbOutfits = await supabaseHelpers.getOutfits();
+    return dbOutfits.map(db => ({
+      id: db.id,
+      name: db.name,
+      itemIds: db.item_ids,
+      mood: db.mood,
+      occasions: db.occasions as any[],
+      createdAt: db.created_at,
+      isFromAI: db.is_from_ai,
+    }));
+  }
+
   return getStorageItem(STORAGE_KEYS.OUTFITS, []);
 }
 
 export async function saveOutfit(outfit: Outfit): Promise<void> {
-  const outfits = await getOutfits();
-  const existingIndex = outfits.findIndex((o) => o.id === outfit.id);
-  if (existingIndex >= 0) {
-    outfits[existingIndex] = outfit;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    await supabaseHelpers.saveOutfit({
+      id: outfit.id,
+      user_id: session.user.id,
+      name: outfit.name,
+      item_ids: outfit.itemIds,
+      mood: outfit.mood,
+      occasions: outfit.occasions,
+      is_from_ai: outfit.isFromAI,
+      created_at: outfit.createdAt,
+    });
   } else {
-    outfits.unshift(outfit);
+    const outfits = await getOutfits();
+    const existingIndex = outfits.findIndex((o) => o.id === outfit.id);
+    if (existingIndex >= 0) {
+      outfits[existingIndex] = outfit;
+    } else {
+      outfits.unshift(outfit);
+    }
+    await setStorageItem(STORAGE_KEYS.OUTFITS, outfits);
   }
-  await setStorageItem(STORAGE_KEYS.OUTFITS, outfits);
 }
 
 export async function deleteOutfit(id: string): Promise<void> {
@@ -437,14 +651,31 @@ export async function deleteOutfit(id: string): Promise<void> {
 // ============ Wear Logs ============
 
 export async function getWearLogs(): Promise<WearLog[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbLogs = await supabaseHelpers.getOutfitLogs();
+    return dbLogs.map(mapFromDbOutfitLog);
+  }
+
   return getStorageItem(STORAGE_KEYS.WEAR_LOGS, []);
 }
 
 export async function saveWearLog(log: WearLog): Promise<void> {
-  const logs = await getWearLogs();
-  logs.unshift(log);
-  await setStorageItem(STORAGE_KEYS.WEAR_LOGS, logs);
-  
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    // Ensure image is uploaded if it's local
+    const remoteUri = log.imageUri ? await uploadIfLocal(log.imageUri, session.user.id, "outfits") : undefined;
+    const logToSave = { ...log, imageUri: remoteUri };
+
+    await supabaseHelpers.saveOutfitLog(mapToDbOutfitLog(logToSave, session.user.id));
+  } else {
+    const logs = await getWearLogs();
+    logs.unshift(log);
+    await setStorageItem(STORAGE_KEYS.WEAR_LOGS, logs);
+  }
+
   // Update wear counts for each item
   for (const itemId of log.itemIds) {
     await updateItemWearCount(itemId);
@@ -496,29 +727,49 @@ export async function setOnboardingComplete(): Promise<void> {
 // ============ Trips & Packing Lists (Premium) ============
 
 export async function getTrips(): Promise<Trip[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbTrips = await supabaseHelpers.getTrips();
+    return dbTrips.map(mapFromDbTrip);
+  }
+
   return getStorageItem(STORAGE_KEYS.TRIPS, []);
 }
 
 export async function saveTrip(trip: Trip): Promise<void> {
-  const trips = await getTrips();
-  const existingIndex = trips.findIndex((t) => t.id === trip.id);
-  if (existingIndex >= 0) {
-    trips[existingIndex] = trip;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const packingList = await getPackingListForTrip(trip.id);
+    await supabaseHelpers.saveTrip(mapToDbTrip(trip, session.user.id, packingList || undefined));
   } else {
-    trips.unshift(trip);
+    const trips = await getTrips();
+    const existingIndex = trips.findIndex((t) => t.id === trip.id);
+    if (existingIndex >= 0) {
+      trips[existingIndex] = trip;
+    } else {
+      trips.unshift(trip);
+    }
+    await setStorageItem(STORAGE_KEYS.TRIPS, trips);
   }
-  await setStorageItem(STORAGE_KEYS.TRIPS, trips);
 }
 
 export async function deleteTrip(id: string): Promise<void> {
-  const trips = await getTrips();
-  const filtered = trips.filter((t) => t.id !== id);
-  await setStorageItem(STORAGE_KEYS.TRIPS, filtered);
-  
-  // Also delete associated packing list
-  const lists = await getPackingLists();
-  const filteredLists = lists.filter((l) => l.tripId !== id);
-  await setStorageItem(STORAGE_KEYS.PACKING_LISTS, filteredLists);
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    await supabaseHelpers.deleteTrip(id);
+  } else {
+    const trips = await getTrips();
+    const filtered = trips.filter((t) => t.id !== id);
+    await setStorageItem(STORAGE_KEYS.TRIPS, filtered);
+
+    // Also delete associated packing list
+    const lists = await getPackingLists();
+    const filteredLists = lists.filter((l) => l.tripId !== id);
+    await setStorageItem(STORAGE_KEYS.PACKING_LISTS, filteredLists);
+  }
 }
 
 export async function getPackingLists(): Promise<PackingList[]> {
@@ -526,19 +777,53 @@ export async function getPackingLists(): Promise<PackingList[]> {
 }
 
 export async function getPackingListForTrip(tripId: string): Promise<PackingList | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbTrips = await supabaseHelpers.getTrips();
+    const trip = dbTrips.find(t => t.id === tripId);
+    if (!trip || !trip.packing_list) return null;
+
+    return {
+      id: `pl-${trip.id}`,
+      tripId: trip.id,
+      items: trip.packing_list.map((name, index) => ({
+        id: `item-${index}`,
+        tripId: trip.id,
+        name,
+        category: "clothing",
+        quantity: 1,
+        isPacked: trip.is_packed,
+        isEssential: true,
+      })),
+      createdAt: trip.created_at,
+      lastModified: trip.created_at,
+    };
+  }
+
   const lists = await getPackingLists();
   return lists.find((l) => l.tripId === tripId) || null;
 }
 
 export async function savePackingList(list: PackingList): Promise<void> {
-  const lists = await getPackingLists();
-  const existingIndex = lists.findIndex((l) => l.id === list.id);
-  if (existingIndex >= 0) {
-    lists[existingIndex] = list;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const trips = await getTrips();
+    const trip = trips.find(t => t.id === list.tripId);
+    if (trip) {
+      await saveTrip(trip); // This will call mapToDbTrip which uses getPackingListForTrip or the list we have
+    }
   } else {
-    lists.unshift(list);
+    const lists = await getPackingLists();
+    const existingIndex = lists.findIndex((l) => l.id === list.id);
+    if (existingIndex >= 0) {
+      lists[existingIndex] = list;
+    } else {
+      lists.unshift(list);
+    }
+    await setStorageItem(STORAGE_KEYS.PACKING_LISTS, lists);
   }
-  await setStorageItem(STORAGE_KEYS.PACKING_LISTS, lists);
 }
 
 export async function togglePackingItemPacked(listId: string, itemId: string): Promise<void> {
@@ -665,34 +950,60 @@ export function generatePackingSuggestions(
 export async function getClosetStats() {
   const items = await getClothingItems();
   const logs = await getWearLogs();
-  
+
   const totalItems = items.length;
   const totalValue = items.reduce((sum, item) => sum + (item.currentValue || item.purchasePrice), 0);
-  
+
   const categoryBreakdown = items.reduce((acc, item) => {
     acc[item.category] = (acc[item.category] || 0) + 1;
     return acc;
   }, {} as Record<ClothingCategory, number>);
-  
-  const mostWornItem = items.reduce((max, item) => 
-    item.wearCount > (max?.wearCount || 0) ? item : max, 
+
+  const colorDistribution = items.reduce((acc, item) => {
+    acc[item.color] = (acc[item.color] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const occasionBreakdown = items.reduce((acc, item) => {
+    item.occasions?.forEach((occ) => {
+      acc[occ] = (acc[occ] || 0) + 1;
+    });
+    return acc;
+  }, {} as Record<string, number>);
+
+  const brandDistribution = items.reduce((acc, item) => {
+    if (item.brand && item.brand !== "Unknown") {
+      acc[item.brand] = (acc[item.brand] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  const mostWornItem = items.reduce((max, item) =>
+    item.wearCount > (max?.wearCount || 0) ? item : max,
     null as ClothingItem | null
   );
-  
+
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const unwornItems = items.filter((item) => {
     if (!item.lastWornAt) return true;
     return new Date(item.lastWornAt) < ninetyDaysAgo;
   });
-  
+
+  const wornItemsCount = items.filter(item => item.wearCount > 0).length;
+  const wearRatio = totalItems > 0 ? (wornItemsCount / totalItems) : 0;
+
   return {
     totalItems,
     totalValue,
     categoryBreakdown,
+    colorDistribution,
+    occasionBreakdown,
+    brandDistribution,
     mostWornItem,
     unwornItems,
     totalWearLogs: logs.length,
+    wearRatio,
   };
 }
 
@@ -711,24 +1022,47 @@ export function generateId(): string {
 // ============ Wishlist Functions ============
 
 export async function getWishlistItems(): Promise<WishlistItem[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    const dbItems = await supabaseHelpers.getWishlistItems();
+    return dbItems.map(mapFromDbWishlistItem);
+  }
+
   return getStorageItem(STORAGE_KEYS.WISHLIST, []);
 }
 
 export async function saveWishlistItem(item: WishlistItem): Promise<void> {
-  const items = await getWishlistItems();
-  const existingIndex = items.findIndex((i) => i.id === item.id);
-  if (existingIndex >= 0) {
-    items[existingIndex] = item;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    // Ensure image is uploaded if it's local
+    const remoteUri = await uploadIfLocal(item.imageUri, session.user.id, "clothing");
+    const itemToSave = { ...item, imageUri: remoteUri };
+
+    await supabaseHelpers.saveWishlistItem(mapToDbWishlistItem(itemToSave, session.user.id));
   } else {
-    items.unshift(item);
+    const items = await getWishlistItems();
+    const existingIndex = items.findIndex((i) => i.id === item.id);
+    if (existingIndex >= 0) {
+      items[existingIndex] = item;
+    } else {
+      items.unshift(item);
+    }
+    await setStorageItem(STORAGE_KEYS.WISHLIST, items);
   }
-  await setStorageItem(STORAGE_KEYS.WISHLIST, items);
 }
 
 export async function deleteWishlistItem(id: string): Promise<void> {
-  const items = await getWishlistItems();
-  const filtered = items.filter((i) => i.id !== id);
-  await setStorageItem(STORAGE_KEYS.WISHLIST, filtered);
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    await supabaseHelpers.deleteWishlistItem(id);
+  } else {
+    const items = await getWishlistItems();
+    const filtered = items.filter((i) => i.id !== id);
+    await setStorageItem(STORAGE_KEYS.WISHLIST, filtered);
+  }
 }
 
 export async function toggleWishlistPriority(id: string): Promise<void> {
@@ -736,7 +1070,87 @@ export async function toggleWishlistPriority(id: string): Promise<void> {
   const item = items.find((i) => i.id === id);
   if (item) {
     item.isPriority = !item.isPriority;
-    await setStorageItem(STORAGE_KEYS.WISHLIST, items);
+    await saveWishlistItem(item);
+  }
+}
+
+// ============ Data Migration ============
+
+export async function syncLocalStorageToCloud(): Promise<{ success: boolean; itemsCount: number }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return { success: false, itemsCount: 0 };
+
+  try {
+    const userId = session.user.id;
+    let syncedCount = 0;
+
+    // Sync Clothing Items
+    const localItems = await getStorageItem<ClothingItem[]>(STORAGE_KEYS.ITEMS, []);
+    if (localItems.length > 0) {
+      console.log(`[Storage] Syncing ${localItems.length} items to cloud...`);
+      for (const item of localItems) {
+        const remoteUri = await uploadIfLocal(item.imageUri, userId, "clothing");
+        const itemWithRemote = { ...item, imageUri: remoteUri };
+        const dbItem = mapToDbClothingItem(itemWithRemote, userId);
+        const saved = await supabaseHelpers.saveClothingItem(dbItem as any);
+        if (saved) syncedCount++;
+      }
+    }
+
+    // Sync Outfits
+    const localOutfits = await getStorageItem<Outfit[]>(STORAGE_KEYS.OUTFITS, []);
+    if (localOutfits.length > 0) {
+      console.log(`[Storage] Syncing ${localOutfits.length} outfits...`);
+      for (const outfit of localOutfits) {
+        await supabaseHelpers.saveOutfit({
+          id: outfit.id,
+          user_id: userId,
+          name: outfit.name,
+          item_ids: outfit.itemIds,
+          mood: outfit.mood,
+          occasions: outfit.occasions,
+          is_from_ai: outfit.isFromAI,
+          created_at: outfit.createdAt,
+        });
+      }
+    }
+
+    // Sync Wishlist
+    const localWishlist = await getStorageItem<WishlistItem[]>(STORAGE_KEYS.WISHLIST, []);
+    if (localWishlist.length > 0) {
+      console.log(`[Storage] Syncing ${localWishlist.length} wishlist items...`);
+      for (const item of localWishlist) {
+        const remoteUri = await uploadIfLocal(item.imageUri, userId, "clothing");
+        const itemWithRemote = { ...item, imageUri: remoteUri };
+        await supabaseHelpers.saveWishlistItem(mapToDbWishlistItem(itemWithRemote, userId));
+      }
+    }
+
+    // Sync Trips
+    const localTrips = await getStorageItem<Trip[]>(STORAGE_KEYS.TRIPS, []);
+    if (localTrips.length > 0) {
+      console.log(`[Storage] Syncing ${localTrips.length} trips...`);
+      for (const trip of localTrips) {
+        const packingList = await getPackingListForTrip(trip.id);
+        await supabaseHelpers.saveTrip(mapToDbTrip(trip, userId, packingList || undefined));
+      }
+    }
+
+    // Sync Wear Logs
+    const localLogs = await getStorageItem<WearLog[]>(STORAGE_KEYS.WEAR_LOGS, []);
+    if (localLogs.length > 0) {
+      console.log(`[Storage] Syncing ${localLogs.length} wear logs...`);
+      for (const log of localLogs) {
+        const remoteUri = log.imageUri ? await uploadIfLocal(log.imageUri, userId, "outfits") : undefined;
+        const logWithRemote = { ...log, imageUri: remoteUri };
+        await supabaseHelpers.saveOutfitLog(mapToDbOutfitLog(logWithRemote, userId));
+      }
+    }
+
+    return { success: true, itemsCount: syncedCount };
+  } catch (error) {
+    console.error("[Storage] Migration error:", error);
+    return { success: false, itemsCount: 0 };
   }
 }
 
@@ -776,101 +1190,101 @@ const CATEGORY_PAIRINGS: Record<ClothingCategory, ClothingCategory[]> = {
 function getColorCompatibilityScore(color1: string, color2: string): number {
   const c1 = color1.toLowerCase();
   const c2 = color2.toLowerCase();
-  
+
   if (c1 === c2) return 70; // Same color - decent match
-  
+
   const compatibleColors = COLOR_COMPATIBILITY[c1] || [];
   if (compatibleColors.includes(c2)) return 90;
-  
+
   // Check reverse
   const reverseCompatible = COLOR_COMPATIBILITY[c2] || [];
   if (reverseCompatible.includes(c1)) return 90;
-  
+
   // Neutral colors always work
   const neutrals = ["black", "white", "gray", "beige", "cream", "tan"];
   if (neutrals.includes(c1) || neutrals.includes(c2)) return 75;
-  
+
   return 40; // Low compatibility
 }
 
 function getOccasionOverlapScore(occasions1: Occasion[], occasions2: Occasion[]): number {
   if (occasions1.length === 0 || occasions2.length === 0) return 50;
-  
+
   const overlap = occasions1.filter((o) => occasions2.includes(o));
   const overlapRatio = overlap.length / Math.min(occasions1.length, occasions2.length);
-  
+
   return Math.round(overlapRatio * 100);
 }
 
 function getSeasonOverlapScore(seasons1: Season[], seasons2: Season[]): number {
   if (seasons1.length === 0 || seasons2.length === 0) return 50;
-  
+
   // All-season matches everything
   if (seasons1.includes("all-season") || seasons2.includes("all-season")) return 100;
-  
+
   const overlap = seasons1.filter((s) => seasons2.includes(s));
   const overlapRatio = overlap.length / Math.min(seasons1.length, seasons2.length);
-  
+
   return Math.round(overlapRatio * 100);
 }
 
 export async function calculateWishlistBlend(wishlistItem: WishlistItem): Promise<WishlistBlend> {
   const closetItems = await getClothingItems();
-  
+
   // Find compatible items from closet
   const compatibleCategories = CATEGORY_PAIRINGS[wishlistItem.category] || [];
-  const potentialMatches = closetItems.filter((item) => 
+  const potentialMatches = closetItems.filter((item) =>
     compatibleCategories.includes(item.category)
   );
-  
+
   // Score each potential match
   const scoredMatches = potentialMatches.map((item) => {
     const colorScore = getColorCompatibilityScore(wishlistItem.color, item.color);
     const occasionScore = getOccasionOverlapScore(wishlistItem.occasions, item.occasions);
     const seasonScore = getSeasonOverlapScore(wishlistItem.seasons, item.seasons);
-    
+
     // Weighted average
     const totalScore = Math.round(
       colorScore * 0.4 + occasionScore * 0.35 + seasonScore * 0.25
     );
-    
+
     return { item, score: totalScore };
   });
-  
+
   // Sort by score and get top matches
   scoredMatches.sort((a, b) => b.score - a.score);
   const topMatches = scoredMatches.slice(0, 10);
-  
+
   // Generate outfit suggestions
   const outfitSuggestions: WishlistBlend["outfitSuggestions"] = [];
-  
+
   // Create up to 3 outfit combinations
   const usedItems = new Set<string>();
-  
+
   for (let i = 0; i < Math.min(3, topMatches.length); i++) {
     const outfitItems: (ClothingItem | WishlistItem)[] = [wishlistItem];
     let outfitScore = 0;
     let itemCount = 1;
-    
+
     // Add compatible items from different categories
     for (const match of topMatches) {
       if (usedItems.has(match.item.id)) continue;
-      
+
       // Check if this category is already in the outfit
-      const existingCategories = outfitItems.map((oi) => 
+      const existingCategories = outfitItems.map((oi) =>
         "purchasePrice" in oi ? oi.category : (oi as WishlistItem).category
       );
-      
+
       if (!existingCategories.includes(match.item.category)) {
         outfitItems.push(match.item);
         outfitScore += match.score;
         itemCount++;
         usedItems.add(match.item.id);
-        
+
         if (outfitItems.length >= 4) break; // Max 4 items per outfit
       }
     }
-    
+
     if (outfitItems.length >= 2) {
       outfitSuggestions.push({
         id: generateId(),
@@ -879,12 +1293,12 @@ export async function calculateWishlistBlend(wishlistItem: WishlistItem): Promis
       });
     }
   }
-  
+
   // Calculate overall compatibility score
   const overallScore = topMatches.length > 0
     ? Math.round(topMatches.slice(0, 5).reduce((sum, m) => sum + m.score, 0) / Math.min(5, topMatches.length))
     : 0;
-  
+
   return {
     wishlistItemId: wishlistItem.id,
     compatibleItems: topMatches.map((m) => m.item),
@@ -899,4 +1313,78 @@ export function getBlendScoreLabel(score: number): { label: string; color: strin
   if (score >= 55) return { label: "Good Addition", color: "#EAB308" };
   if (score >= 40) return { label: "Moderate Fit", color: "#F97316" };
   return { label: "Low Match", color: "#EF4444" };
+}
+
+/**
+ * Attempts to fix broken image URIs in the database by uploading local files
+ * that haven't been synced yet.
+ */
+export async function cleanupBrokenImages(): Promise<{ fixed: number; failed: number }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return { fixed: 0, failed: 0 };
+
+  const userId = session.user.id;
+  let fixedCount = 0;
+  let failedCount = 0;
+
+  try {
+    // Check Clothing Items
+    const items = await getClothingItems();
+    for (const item of items) {
+      if (supabaseHelpers.isLocalUri(item.imageUri)) {
+        try {
+          const remoteUri = await uploadIfLocal(item.imageUri, userId, "clothing");
+          if (remoteUri !== item.imageUri) {
+            await saveClothingItem({ ...item, imageUri: remoteUri });
+            fixedCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (e) {
+          failedCount++;
+        }
+      }
+    }
+
+    // Check Wear Logs
+    const logs = await getWearLogs();
+    for (const log of logs) {
+      if (log.imageUri && supabaseHelpers.isLocalUri(log.imageUri)) {
+        try {
+          const remoteUri = await uploadIfLocal(log.imageUri, userId, "outfits");
+          if (remoteUri !== log.imageUri) {
+            await saveWearLog({ ...log, imageUri: remoteUri });
+            fixedCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (e) {
+          failedCount++;
+        }
+      }
+    }
+
+    // Check Wishlist
+    const wishlist = await getWishlistItems();
+    for (const item of wishlist) {
+      if (supabaseHelpers.isLocalUri(item.imageUri)) {
+        try {
+          const remoteUri = await uploadIfLocal(item.imageUri, userId, "clothing");
+          if (remoteUri !== item.imageUri) {
+            await saveWishlistItem({ ...item, imageUri: remoteUri });
+            fixedCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (e) {
+          failedCount++;
+        }
+      }
+    }
+
+    return { fixed: fixedCount, failed: failedCount };
+  } catch (error) {
+    console.error("[Storage] Cleanup error:", error);
+    return { fixed: fixedCount, failed: failedCount };
+  }
 }

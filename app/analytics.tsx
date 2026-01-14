@@ -1,219 +1,176 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Text,
   View,
   ScrollView,
   StyleSheet,
+  Pressable,
   Dimensions,
-  ActivityIndicator,
-  RefreshControl,
 } from "react-native";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { PieChart, BarChart } from "react-native-chart-kit";
+import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { BlurView } from "expo-blur";
-
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useAuth } from "@/contexts/AuthContext";
-import { getAnalyticsSummary, AnalyticsSummary } from "@/lib/analytics";
-import { calculateCostPerWear } from "@/lib/storage";
+import { getClosetStats, ClothingCategory } from "@/lib/storage";
 
 const { width } = Dimensions.get("window");
 
-export default function AnalyticsScreen() {
-  const router = useRouter();
-  const colors = useColors();
-  const { isPro } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
+const CATEGORY_COLORS: Record<string, string> = {
+  tops: "#4CAF50",
+  bottoms: "#2196F3",
+  shoes: "#FF9800",
+  accessories: "#9C27B0",
+  outerwear: "#F44336",
+  dresses: "#E91E63",
+  swimwear: "#00BCD4",
+};
 
-  const loadData = useCallback(async () => {
-    try {
-      const summary = await getAnalyticsSummary();
-      setData(summary);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+export default function AnalyticsScreen() {
+  const colors = useColors();
+  const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadStats();
+  }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
+  const loadStats = async () => {
+    const data = await getClosetStats();
+    setStats(data);
   };
 
-  if (loading) {
-    return (
-      <ScreenContainer>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </ScreenContainer>
-    );
-  }
+  if (!stats) return null;
 
-  if (!data) return null;
+  const renderStatCard = (title: string, value: string | number, sub: string, icon: string, color: string) => (
+    <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+      <View style={[styles.iconCircle, { backgroundColor: color + "20" }]}>
+        <MaterialIcons name={icon as any} size={24} color={color} />
+      </View>
+      <View>
+        <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
+        <Text style={[styles.statTitle, { color: colors.muted }]}>{title}</Text>
+        <Text style={[styles.statSub, { color: color }]}>{sub}</Text>
+      </View>
+    </View>
+  );
 
-  const chartConfig = {
-    backgroundGradientFrom: colors.surface,
-    backgroundGradientTo: colors.surface,
-    color: (opacity = 1) => colors.primary,
-    labelColor: (opacity = 1) => colors.muted,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-    decimalPlaces: 0,
-  };
+  const topColors = Object.entries(stats.colorDistribution || {})
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
 
-  // Prepare Pie Chart Data
-  const categoryPieData = data.categoryBreakdown.labels.map((label, index) => ({
-    name: label,
-    population: data.categoryBreakdown.data[index],
-    color: data.categoryBreakdown.colors[index],
-    legendFontColor: colors.muted,
-    legendFontSize: 12,
-  }));
-
-  const colorPieData = data.colorBreakdown.labels.map((label, index) => ({
-    name: label,
-    population: data.colorBreakdown.data[index],
-    color: data.colorBreakdown.colors[index],
-    legendFontColor: colors.muted,
-    legendFontSize: 12,
-  }));
+  const topBrands = Object.entries(stats.brandDistribution || {})
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 3);
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={colors.foreground} 
-            onPress={() => router.back()}
-            style={{ marginRight: 16 }}
-        />
-        <Text style={[styles.title, { color: colors.foreground }]}>Closet Analytics</Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
+        </Pressable>
+        <Text style={[styles.title, { color: colors.foreground }]}>Wardrobe Insights</Text>
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        {/* KPI Cards */}
-        <View style={styles.kpiContainer}>
-            <View style={[styles.kpiCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.kpiLabel, { color: colors.muted }]}>Total Value</Text>
-                <Text style={[styles.kpiValue, { color: colors.foreground }]}>
-                    ${data.totalValue.toLocaleString()}
-                </Text>
-            </View>
-            <View style={[styles.kpiCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.kpiLabel, { color: colors.muted }]}>Items</Text>
-                <Text style={[styles.kpiValue, { color: colors.foreground }]}>
-                    {data.totalItems}
-                </Text>
-            </View>
-        </View>
-        <View style={styles.kpiContainer}>
-            <View style={[styles.kpiCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.kpiLabel, { color: colors.muted }]}>Avg Cost/Wear</Text>
-                <Text style={[styles.kpiValue, { color: colors.success }]}>
-                    ${data.avgCostPerWear.toFixed(2)}
-                </Text>
-            </View>
-            <View style={[styles.kpiCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.kpiLabel, { color: colors.muted }]}>Est. Monthly Spend</Text>
-                <Text style={[styles.kpiValue, { color: colors.warning }]}>
-                    ${data.monthlySpend.toFixed(0)}
-                </Text>
-            </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Top Summary Stats */}
+        <View style={styles.summaryGrid}>
+          {renderStatCard(
+            "Worn Rate",
+            `${Math.round(stats.wearRatio * 100)}%`,
+            "Active Wardrobe",
+            "auto-graph",
+            colors.primary
+          )}
+          {renderStatCard(
+            "Value/Item",
+            `$${Math.round(stats.totalValue / (stats.totalItems || 1))}`,
+            "Avg. Investment",
+            "payments",
+            colors.success
+          )}
         </View>
 
-        {/* Categories Chart */}
-        <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.chartTitle, { color: colors.foreground }]}>Categories</Text>
-            <PieChart
-                data={categoryPieData}
-                width={width - 48}
-                height={220}
-                chartConfig={chartConfig}
-                accessor={"population"}
-                backgroundColor={"transparent"}
-                paddingLeft={"15"}
-                center={[10, 0]}
-                absolute
-            />
+        {/* Category Breakdown Chart */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionHeader, { color: colors.foreground }]}>Composition</Text>
+          <View style={styles.chartWrapper}>
+            <View style={styles.progressBar}>
+              {Object.entries(stats.categoryBreakdown).map(([cat, count]: [any, any]) => (
+                <View
+                  key={cat}
+                  style={{
+                    flex: count as number,
+                    height: "100%",
+                    backgroundColor: CATEGORY_COLORS[cat] || colors.border,
+                    marginHorizontal: 1
+                  }}
+                />
+              ))}
+            </View>
+            <View style={styles.legendGrid}>
+              {Object.entries(stats.categoryBreakdown).map(([cat, count]: [any, any]) => (
+                <View key={cat} style={styles.legendItem}>
+                  <View style={[styles.dot, { backgroundColor: CATEGORY_COLORS[cat] || colors.border }]} />
+                  <Text style={[styles.legendText, { color: colors.foreground }]}>
+                    {cat} ({Math.round((count / stats.totalItems) * 100)}%)
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
 
-        {/* Colors Chart */}
-        <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.chartTitle, { color: colors.foreground }]}>Color Palette</Text>
-            <PieChart
-                data={colorPieData}
-                width={width - 48}
-                height={220}
-                chartConfig={chartConfig}
-                accessor={"population"}
-                backgroundColor={"transparent"}
-                paddingLeft={"15"}
-                center={[10, 0]}
-                absolute
-            />
+        {/* Color Palette */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionHeader, { color: colors.foreground }]}>Color Palette</Text>
+          <View style={styles.colorPalette}>
+            {topColors.map(([color, count]: [any, any]) => (
+              <View key={color} style={styles.colorItem}>
+                <View style={[styles.colorChip, { backgroundColor: color.toLowerCase() === "white" ? "#F5F5F5" : color.toLowerCase() }]} />
+                <Text style={[styles.colorName, { color: colors.foreground }]}>{color}</Text>
+                <Text style={[styles.colorCount, { color: colors.muted }]}>{count} items</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Most Worn Items */}
-        <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Most Worn Items</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-                {data.mostWornItems.map((item) => (
-                    <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
-                        <Image source={{ uri: item.imageUri }} style={styles.itemImage} contentFit="cover" />
-                        <View style={styles.itemInfo}>
-                            <Text numberOfLines={1} style={[styles.itemName, { color: colors.foreground }]}>
-                                {item.brand || item.type}
-                            </Text>
-                            <Text style={[styles.itemStat, { color: colors.primary }]}>
-                                {item.wearCount} wears
-                            </Text>
-                            <Text style={[styles.itemSubStat, { color: colors.success }]}>
-                                ${calculateCostPerWear(item).toFixed(2)} / wear
-                            </Text>
-                        </View>
-                    </View>
-                ))}
-            </ScrollView>
-        </View>
+        {/* Efficiency Insights */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionHeader, { color: colors.foreground }]}>Style Efficiency</Text>
 
-        {/* Least Worn Items */}
-        <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Needs Love (Least Worn)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-                {data.leastWornItems.map((item) => (
-                    <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
-                        <Image source={{ uri: item.imageUri }} style={styles.itemImage} contentFit="cover" />
-                        <View style={styles.itemInfo}>
-                            <Text numberOfLines={1} style={[styles.itemName, { color: colors.foreground }]}>
-                                {item.brand || item.type}
-                            </Text>
-                            <Text style={[styles.itemStat, { color: colors.muted }]}>
-                                {item.wearCount} wears
-                            </Text>
-                            <Text style={[styles.itemSubStat, { color: colors.warning }]}>
-                                Last worn: {item.lastWornAt ? new Date(item.lastWornAt).toLocaleDateString() : "Never"}
-                            </Text>
-                        </View>
-                    </View>
-                ))}
-            </ScrollView>
+          <View style={styles.insightRow}>
+            <MaterialIcons name="star-outline" size={20} color={colors.primary} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: colors.foreground }]}>Most Used Item</Text>
+              <Text style={[styles.insightValue, { color: colors.muted }]}>
+                {stats.mostWornItem ? `${stats.mostWornItem.brand} ${stats.mostWornItem.type}` : "None yet"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.insightRow}>
+            <MaterialIcons name="inventory-2" size={20} color={colors.warning || "#FF9800"} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: colors.foreground }]}>Untouched Items</Text>
+              <Text style={[styles.insightValue, { color: colors.muted }]}>
+                {stats.unwornItems.length} items haven't been worn in 90 days.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.insightRow}>
+            <MaterialIcons name="business" size={20} color={colors.primary} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: colors.foreground }]}>Top Brands</Text>
+              <Text style={[styles.insightValue, { color: colors.muted }]}>
+                {topBrands.map(b => b[0]).join(", ") || "No brand data"}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <View style={{ height: 40 }} />
@@ -223,98 +180,135 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  backButton: {
+    marginRight: 12,
+  },
   title: {
     fontSize: 24,
     fontWeight: "700",
   },
-  kpiContainer: {
+  scrollContent: {
+    padding: 16,
+  },
+  summaryGrid: {
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 20,
   },
-  kpiCard: {
+  statCard: {
     flex: 1,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
   },
-  kpiLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 4,
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  kpiValue: {
+  statValue: {
     fontSize: 20,
     fontWeight: "700",
   },
-  chartCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 16,
-    alignItems: "center",
+  statTitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  chartTitle: {
-    fontSize: 16,
+  statSub: {
+    fontSize: 10,
     fontWeight: "600",
-    marginBottom: 8,
-    alignSelf: "flex-start",
+    marginTop: 2,
+    textTransform: "uppercase",
   },
   section: {
-    marginTop: 24,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
   },
-  sectionTitle: {
+  sectionHeader: {
     fontSize: 18,
     fontWeight: "700",
-    marginLeft: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  horizontalScroll: {
-    paddingLeft: 16,
+  chartWrapper: {
+    gap: 16,
   },
-  itemCard: {
-    width: 140,
-    marginRight: 12,
-    borderRadius: 12,
+  progressBar: {
+    height: 12,
+    borderRadius: 6,
+    flexDirection: "row",
     overflow: "hidden",
-    paddingBottom: 8,
   },
-  itemImage: {
-    width: "100%",
-    height: 140,
+  legendGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
   },
-  itemInfo: {
-    padding: 8,
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  itemName: {
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  colorPalette: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  colorItem: {
+    alignItems: "center",
+    width: (width - 72) / 3,
+  },
+  colorChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
+  },
+  colorName: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  colorCount: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  insightRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+  insightContent: {
+    flex: 1,
+  },
+  insightTitle: {
     fontSize: 14,
     fontWeight: "600",
   },
-  itemStat: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  itemSubStat: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-  lockOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
+  insightValue: {
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
   },
 });

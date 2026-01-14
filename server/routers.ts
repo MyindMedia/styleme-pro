@@ -5,6 +5,7 @@ import { ENV } from "./_core/env";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import FirecrawlApp from "@mendable/firecrawl-js";
 
 // User agent strings for different scenarios
 const USER_AGENTS = {
@@ -545,6 +546,44 @@ Generate search queries that would work on Google Shopping, Amazon, or fashion r
       }))
       .mutation(async ({ input }) => {
         try {
+          // 1. Try Firecrawl if configured (Best for protected sites & extraction)
+          if (ENV.firecrawlApiKey) {
+            try {
+              console.log("Using Firecrawl for scraping:", input.productUrl);
+              const app = new FirecrawlApp({ apiKey: ENV.firecrawlApiKey });
+              
+              const scrapeResult = await app.scrape(input.productUrl, {
+                formats: [
+                  {
+                    type: "json",
+                    schema: urlScrapingSchema.schema
+                  }
+                ]
+              });
+
+              if (scrapeResult.json) {
+                const data = scrapeResult.json as any;
+                
+                // If extraction was successful
+                if (data.success && data.item) {
+                  data.item.productUrl = input.productUrl;
+                  
+                  // Ensure image URL is absolute
+                  if (data.item.imageUrl && !data.item.imageUrl.startsWith("http")) {
+                    try {
+                      data.item.imageUrl = new URL(data.item.imageUrl, input.productUrl).href;
+                    } catch (e) {
+                      // Ignore URL parsing errors
+                    }
+                  }
+                  return data;
+                }
+              }
+            } catch (error) {
+              console.error("Firecrawl scraping failed, falling back to standard fetch:", error);
+            }
+          }
+
           // Parse domain for site-specific handling
           const urlObj = new URL(input.productUrl);
           const domain = urlObj.hostname.toLowerCase();

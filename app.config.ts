@@ -30,7 +30,7 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
+  newArchEnabled: false,
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
@@ -104,6 +104,26 @@ const config: ExpoConfig = {
       },
     ],
     "expo-font",
+    [
+      "expo-media-library",
+      {
+        photosPermission: "Allow $(PRODUCT_NAME) to access your photos.",
+        savePhotosPermission: "Allow $(PRODUCT_NAME) to save photos.",
+        isAccessMediaLocationEnabled: true,
+      },
+    ],
+    [
+      "expo-camera",
+      {
+        cameraPermission: "Allow $(PRODUCT_NAME) to access your camera.",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        locationAlwaysAndWhenInUsePermission: "Allow $(PRODUCT_NAME) to use your location.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
